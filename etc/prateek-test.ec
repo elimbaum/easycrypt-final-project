@@ -1,9 +1,8 @@
 
-(*
 prover quorum=2 ["Alt-Ergo" "Z3"].
 timeout 2.  (* limit SMT solvers to two seconds *)
 require import AllCore Distr.
-*)
+
 
 require (*---*) DynMatrix Matrix.
 
@@ -14,7 +13,7 @@ op ZR.zeror  <- 0,
 op ZR.oner   <- 1,
 op ZR.( + )  <- Top.Int.( + ),
 op ZR.([-])  <- Top.Int.([-]),
-op ZR.( * ) <- Top.Int.( * )
+op ZR.( * )  <- Top.Int.( * )
 
 proof ZR.addrA by exact addrA,
 ZR.addrC by exact addrC,
@@ -51,6 +50,8 @@ module T = {
     return b;
   }
 *)
+
+(* offunm: function, pass in coordinates range i, j *)
   proc f(i j : int):unit = {
     mat_x <- offunm ( f_diag_1, i, j);
     mat_y <- offunm ( f_diag_1, i, j);
@@ -61,7 +62,8 @@ module T = {
 }.
 
 lemma matrix_rows_cols_check(i_ j_ : int):
-  hoare[T.f: 0 < i_ /\ 0 < j_ /\ i = i_ /\ j = j_  ==> rows T.mat_x = i_ /\cols T.mat_x = j_].
+  (* `rows` returns number of rows. `cols` returns number of cols *)
+  hoare[T.f: 0 < i_ /\ 0 < j_ /\ i = i_ /\ j = j_  ==> rows T.mat_x = i_ /\ cols T.mat_x = j_].
 proof.
 proc.
 auto => />.
@@ -117,17 +119,27 @@ qed.
 
 (* Matrix with the values of v on the diagonal and zeror off the diagonal *)
 
-(*
-lemma diagonal_elements_are_one(i_ : int):
-  hoare[T.f: 0 <= i_ /\ i = i_ /\ j = i_  ==>  T.mat_x.[i_, i_] = 1].
+
+(* check bottom corner *)
+lemma diagonal_elements_are_one(i_ j_ : int):
+  hoare[T.f: 0 <= i_ /\ 0 <= j_ /\ j = j_ /\ i = i_ /\ j_ <> i_ ==>  T.mat_x.[i_, j_] = 0].
 proof.
 proc.
 auto => />.
 progress.
 rewrite offunm0E.
-
 smt().
-
+trivial.
 qed.
 
-*)
+lemma diagonal_elements_are_one(i_ j_ : int):
+  hoare[T.f: i <> j /\ 0 <= i_ <= i /\ 0 <= j_ <= j /\ j_ <> i_ ==>  T.mat_x.[i_, j_] = 0].
+proof.
+proc.
+auto => />.
+progress.
+rewrite offunm0E.
+apply negbT.
+split.
+trivial.
+qed.

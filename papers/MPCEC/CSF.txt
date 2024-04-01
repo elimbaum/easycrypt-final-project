@@ -1,0 +1,3 @@
+The file Mult.ec contains the multiplication protocol
+The file MPC_addition_active.ec contains the addition protocol
+The other files are small standalone libraries

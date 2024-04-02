@@ -28,9 +28,14 @@ ZR.mulrDl by exact mulrDl.
 import Mat_A.Matrices.
 
 
-op f_diag_1 (i j : int) : int = 
-  if i = j then 1 else 0.
+op f_diag_1 (m n : int) : int = 
+  if m = n then 1 else 0.
 
+op f_diag_0 (m n : int) : int = 
+  if m = n then 0 else n.
+
+
+(* CODE FOR  i x j matrix 
 
 (*op createMatrix(x y : int): matrix = offunm (f_poly, x, y).*)
 
@@ -55,7 +60,6 @@ module T = {
   proc f(i j : int):unit = {
     mat_x <- offunm ( f_diag_1, i, j);
     mat_y <- offunm ( f_diag_1, i, j);
-    mat_z <- offunm ( f_diag_1, i, j);
     mat_z <- mat_x + mat_y;
     mat_w <- mat_x - mat_y;
   }
@@ -141,5 +145,40 @@ progress.
 rewrite offunm0E.
 apply negbT.
 split.
+trivial.
+qed.
+*)
+
+module A = {
+  var mat_a: matrix
+  proc f(n : int):unit = {
+    mat_a <- offunm (f_diag_0, n, n);
+  }
+}.
+
+lemma not_intro (a : bool) :
+  (a => false) => ! a.
+proof. trivial. qed.
+
+lemma diagonal_elements_are_zero(mat: matrix, n_ : int):
+  hoare[A.f: n = n_ /\ 0 <= n_ ==> forall a, 0 <= a < n_ =>  A.mat_a.[a, a] = 0].
+proof.
+proc.
+auto => />.
+
+progress.
+
+
+
+rewrite offunm0E.
+apply not_intro.
+
+
+smt().
+rewrite /rows in H1.
+rewrite 
+
+
+
 trivial.
 qed.

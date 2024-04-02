@@ -27,15 +27,35 @@ ZR.mulrDl by exact mulrDl.
 
 import Mat_A.Matrices.
 
+(* p - party
+ * s - share
+ *
+ * semantics: party i does NOT have share i
+ *)
+op f_share (p s : int) : int =
+  if p = s then 0 else s.
 
-op f_diag_1 (m n : int) : int = 
-  if m = n then 1 else 0.
+module T = {
+  var m: matrix
+  proc f(n : int):unit = {
+    m <- offunm (f_share, n, n);
+  }
+}.
 
-op f_diag_0 (m n : int) : int = 
-  if m = n then 0 else n.
+lemma diagonal_equal_zero_check(mat: matrix, n_ : int):
+  hoare[T.f: n = n_ /\ 0 <= n_ ==> forall a, mrange mat n_ n_ =>  T.m.[a, a] = 0].
+proof.
+proc.
+auto => />.
+progress.
+smt(get_offunm).
+qed.
 
 
 (* CODE FOR  i x j matrix 
+
+op f_diag_1 (m n : int) : int = 
+  if m = n then 1 else 0.
 
 (*op createMatrix(x y : int): matrix = offunm (f_poly, x, y).*)
 
@@ -149,36 +169,4 @@ trivial.
 qed.
 *)
 
-module A = {
-  var mat_a: matrix
-  proc f(n : int):unit = {
-    mat_a <- offunm (f_diag_0, n, n);
-  }
-}.
 
-lemma not_intro (a : bool) :
-  (a => false) => ! a.
-proof. trivial. qed.
-
-lemma diagonal_elements_are_zero(mat: matrix, n_ : int):
-  hoare[A.f: n = n_ /\ 0 <= n_ ==> forall a, 0 <= a < n_ =>  A.mat_a.[a, a] = 0].
-proof.
-proc.
-auto => />.
-
-progress.
-
-
-
-rewrite offunm0E.
-apply not_intro.
-
-
-smt().
-rewrite /rows in H1.
-rewrite 
-
-
-
-trivial.
-qed.

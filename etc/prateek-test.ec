@@ -27,6 +27,76 @@ ZR.mulrDl by exact mulrDl.
 
 import Mat_A.Matrices.
 
+(* INP is of type prematrix -> int -> int -> premarix*)
+(* This can be an option to create the input matrix for INP *)
+op f_inp_in (i j : int):int =
+  if j = 3 && (i = 0 || i = 1) then j else -1.
+
+(* Important functions in DynMatrix.eca 
+
+1) Constant valued matrix with r rows and c columns 
+op matrixc (rows cols: int) (c : R) = offunm ((fun _ _ => c), rows, cols).
+
+2) Matrix with the values of v on the diagonal and zeror off the diagonal 
+op diagmx (v : vector) =
+  offunm ((fun i j => if i = j then v.[i] else zeror), size v, size v).
+
+3) Matrix with constant values on the diagonal 
+abbrev diagc n (c : R) = diagmx (vectc n c).
+
+4) n by n identity matrix 
+abbrev onem n = diagc n oner.
+
+5) r by c zero matrix
+abbrev zerom r c  = matrixc r c zeror.
+
+6) 0 by 0 matrix also used as error state when there is a size mismatch 
+op emptym = zerom 0 0.
+
+7) lifting functions to matrices 
+op mapm (f : R -> R) (m : matrix) : matrix = 
+  offunm (fun i j => f m.[i, j], rows m, cols m).
+
+8) Gets the n-th row of m as a vector 
+op row m n = offunv (fun i => m.[n, i], cols m).
+
+9) Gets the n-th column of m as a vector 
+op col m n = offunv (fun i => m.[i, n], rows m).
+
+10) Turns row vector into matrix 
+op rowmx (v: vector) = offunm ((fun _ i => v.[i]), 1, size v).
+
+11) turns column vector into matrix 
+op colmx (v: vector) = offunm ((fun i _ => v.[i]), size v, 1).
+
+12) Sideways matrix concatenation - aka row block matrices
+op catmr (m1 m2: matrix) = 
+  offunm ((fun i j => m1.[i, j] + m2.[i, j-cols m1]), 
+          max (rows m1) (rows m2), cols m1 + cols m2).
+
+13) Downwards matrix concatenation - aka column block matrices
+op catmc (m1 m2: matrix) =
+  offunm ((fun i j => m1.[i, j] + m2.[i-rows m1, j]), 
+          rows m1 + rows m2, max (cols m1) (cols m2)).
+
+14) Taking a submatrix from row r1 (inclusive) to r2 (exclusive) and
+   column c1 (inclusive) to c2 (exclusive). 
+   That is m = subm 0 (rows m) 0 (cols m) 
+op subm (m: matrix) (r1 r2 c1 c2: int) = 
+  offunm ((fun i j => m.[i+r1,j+c1]), r2-r1, c2-c1).
+
+15) Updating one entry of a matrix
+op updm (m: matrix) (r c: int) (p: t) = offunm 
+  (fun (i j: int) => if i = r /\ j = c then p else m.[i,j], rows m, cols m).
+
+16) dmatrix helper function: construct matrix from list of (column) vectors 
+op ofcols r c (vs : vector list) =
+  offunm (fun (i j : int) => (nth witness vs j).[i], r, c).
+
+*)
+
+
+
 (* p - party
  * s - share
  *
@@ -50,6 +120,43 @@ auto => />.
 progress.
 smt(get_offunm).
 qed.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 (* CODE FOR  i x j matrix 

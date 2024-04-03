@@ -4,7 +4,7 @@ timeout 2.  (* limit SMT solvers to two seconds *)
 require import AllCore Distr.
 
 
-require (*---*) DynMatrix Matrix.
+require (*---*) DynMatrix.
 
 
 clone DynMatrix as Mat_A with
@@ -94,7 +94,6 @@ op ofcols r c (vs : vector list) =
   offunm (fun (i j : int) => (nth witness vs j).[i], r, c).
 
 *)
-
 
 
 (* p - party

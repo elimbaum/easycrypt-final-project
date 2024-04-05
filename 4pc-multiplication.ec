@@ -38,25 +38,23 @@ module F4 = {
   var x : matrix
   (* init constant? this should be 4 *)
   var n : int
+  var err : int
 
   (* p has a value x and wants to share it with all other parties *)
   proc share(x : int, p : party) : matrix = {
     var s0, s1, s2, s3 : int;
 
     var shares : int list;
-    shares <- [];
 
     (* generate 3 random *)
     s0 <$ randint;
-    shares <- shares ++ [s0];
 
     s1 <$ randint;
-    shares <- shares ++ [s1];
 
     s2 <$ randint;
-    shares <- shares ++ [s2];
+    shares <- [s0; s1; s2];
 
-    s3 <- x - s0 - s1 - s2;
+    s3 <- x - sumz(shares);
     shares <- shares ++ [s3];
 
     (* TODO: think about if we should use vector here instead of list *)
@@ -65,7 +63,7 @@ module F4 = {
        maybe we can factor that out?
      *)
     return offunm ((fun p s =>
-        if p = s then 0 else (nth 0 shares s)), n, n);
+        if p = s then 0 else (nth err shares s)), n, n);
   }
 
   (* parties si and sj know x, and want to send it to party d.
@@ -74,9 +72,16 @@ module F4 = {
   proc jmp(x : int, si sj : party, d : party) : matrix = {
     (* TODO: party d gets x from si, and H(x) from sj *)
     (* abort if hashes don't check out *)
-    var g : party;
-    (* TODO: this should be the excluded party *)
-    g <- 3;
+    var g : int;
+
+    (* compute the excluded party g *)
+    var p : int list;
+    (* list 0..n *)
+    p <- range 0 n;
+    (* remove current parties *)
+    p <- rem si (rem sj (rem d p));
+    g <- head err p;
+
     return offunm ((fun p s =>
         if p = s then 0 else
         if g = s then x else 0), n, n);
@@ -89,10 +94,14 @@ module F4 = {
     var r : int;
     var g, h : party;
 
-    (* in the paper this is a PRF, but for now model as RO *)
-    r <$ randint;
+    (* figure out excluded parties g, h *)
+    var p : int list;
+    p <- rem i (rem j (range 0 n));
+    g <- nth err p 0;
+    h <- nth err p 1;
 
-    g <- 0; h <- 1;
+    (* in the paper this is a PRF, but for now model as truly random *)
+    r <$ randint;
 
     (* need to derive g, h *)
     return offunm ((fun p s =>
@@ -123,6 +132,7 @@ module F4 = {
        this implements inp_local: no communication occurs *)
     mlocal <- x * y;
 
+    (* elementwise addition *)
     return m01 + m02 + m03 + m12 + m13 + m23 + mlocal;   
   }
 

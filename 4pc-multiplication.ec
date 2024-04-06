@@ -1,5 +1,5 @@
 prover quorum=2 ["Alt-Ergo" "Z3"].
-timeout 2.  (* limit SMT solvers to two seconds *)
+timeout 1.  (* limit SMT solvers to two seconds *)
 require import AllCore Distr List.
 
 
@@ -34,6 +34,9 @@ op randint : int distr.
 
 (* matrix semantics are [party, share] *)
 
+
+(* note: maybe use fset for party determination? *)
+
 module F4 = {
   var x : matrix
   (* init constant? this should be 4 *)
@@ -41,27 +44,29 @@ module F4 = {
   var err : int
 
   (* p has a value x and wants to share it with all other parties *)
-  proc share(x : int, p : party) : matrix = {
-    var s0, s1, s2, s3 : int;
+  proc share(x p : int) : matrix = {
+    var s0, s1, s2, s_, s3 : int;
 
     var shares : int list;
 
-    (* generate 3 random *)
+    (* generate random *)
     s0 <$ randint;
-
     s1 <$ randint;
-
     s2 <$ randint;
-    shares <- [s0; s1; s2];
+    s3 <$ randint;
+    shares <- [s0; s1; s2; s3];
 
-    s3 <- x - sumz(shares);
-    shares <- shares ++ [s3];
+    shares <- put shares p 0;
+
+    s_ <- x - sumz(shares);
+    shares <- put shares p s_;
 
     (* TODO: think about if we should use vector here instead of list *)
     (* TODO: basically every `offunm` call is going to have the structure
         if p = s then 0 else ...
        maybe we can factor that out?
      *)
+    (* TODO oops need to factor in p. right now, fixing data owner. *)
     return offunm ((fun p s =>
         if p = s then 0 else (nth err shares s)), n, n);
   }
@@ -91,8 +96,9 @@ module F4 = {
      parties.
    *)
   proc inp(x : int, i j : party) : matrix = {
-    var r : int;
+    var r, xh : int;
     var g, h : party;
+    var pgm : matrix;
 
     (* figure out excluded parties g, h *)
     var p : int list;
@@ -100,15 +106,19 @@ module F4 = {
     g <- nth err p 0;
     h <- nth err p 1;
 
-    (* in the paper this is a PRF, but for now model as truly random *)
+    (* in the paper this is a PRF, but for now model as truly random
+       and just don't give it to party g. *)
     r <$ randint;
 
-    (* need to derive g, h *)
-    return offunm ((fun p s =>
-        (* zero on the diagonal, and also shares xi, xj *)
-        if p = s \/ p = i \/ p = j then 0 else
-        if p = g then r
-        else (* p = h *) x - r), n, n);
+    xh <- x - r;
+
+    (* Pg learns xh *)
+    pgm <@ jmp(xh, i, j, g);
+
+    (* xi = xj = 0, xg = r, xh = x - r *)
+    return pgm + offunm ((fun p s => 
+      if s = p then 0 else
+      if s = g then r else 0), n, n);
   }
 
   proc mult(x y : matrix) : matrix = {
@@ -142,12 +152,9 @@ module F4 = {
     return m.[0, 1] + m.[0, 2] + m.[0, 3] + m.[1, 0];
   }
 
-  proc correct() : bool = {
-    var x, y, z : int;
+  proc main(x y : int) : int = {
+    var z : int;
     var mx, my, mz : matrix;
-
-    x <$ randint;
-    y <$ randint;
 
     (* assume P1 holds x and P2 holds y *)
     mx <@ share(x, 1);
@@ -157,14 +164,69 @@ module F4 = {
 
     z <@ open(mz);
 
-    return z = x * y;
+    return z;
     
+  }
+
+  proc share_main(x p : int) : int = {
+    var m : matrix;
+    var z : int;
+    
+    m <@ share(x, p);
+    z <@ open(m);
+    return z;
   }
 }.
 
-lemma mul_correct(x y : int) :
-    hoare[F4.correct : ].
+(* Prove the sharing scheme works. *)
+lemma share_correct(x_ p_ int) :
+    hoare[F4.share_main : x = x_ /\ p = p_ /\ 0 <= p < 4 ==> res = x_].
 proof.
+proc.
+inline*.
+sp.
+(* ...and others are random *)
+seq 6 : (p < size shares /\ nth F4.err shares p = 0).
+auto.
+progress.
+rewrite size_put.
+smt().
+smt(nth_put put_nth).
+seq 2 : (sumz shares = x0).
+auto.
+progress.
+
+wp.
+qed.
+
+(* Prove the sharing scheme is secure. *)
+
+(* need lemma valid shares *)
+
+lemma mul_correct(x_ y_ : int) :
+    hoare[F4.main : x = x_ /\ y = y_ ==> res = x_ * y_].
+proof.
+proc.
+(* call - how to use invariants?
+   or is inline ok?
+   need to reason about uniform randomness: argue indist. from rand submatrix *)
+inline F4.open.
+wp.
+seq 1 : (mx).
+inline F4.mult.
+wp.
+inline (6) F4.inp.
+
+inline (1) F4.share.
+sp.
+seq 1 : (true).
+rnd.
+rewrite /randint.
+
+auto.
+call (_: true).
+
+sp.
 
 qed.
 

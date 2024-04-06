@@ -34,13 +34,14 @@ op randint : int distr.
 
 (* matrix semantics are [party, share] *)
 
+(* We have four parties. *)
+op n : int.
+axiom _4p : n = 4.
 
-(* note: maybe use fset for party determination? *)
+(* note: maybe use fset instead of list for party determination? *)
 
 module F4 = {
   var x : matrix
-  (* init constant? this should be 4 *)
-  var n : int
   var err : int
 
   (* p has a value x and wants to share it with all other parties *)
@@ -56,8 +57,10 @@ module F4 = {
     s3 <$ randint;
     shares <- [s0; s1; s2; s3];
 
+    (* zero out the p'th share *)
     shares <- put shares p 0;
 
+    (* and set it such that the new sum equals x *)
     s_ <- x - sumz(shares);
     shares <- put shares p s_;
 
@@ -178,25 +181,40 @@ module F4 = {
   }
 }.
 
-(* Prove the sharing scheme works. *)
+(* Prove correctness of the sharing scheme. *)
 lemma share_correct(x_ p_ int) :
-    hoare[F4.share_main : x = x_ /\ p = p_ /\ 0 <= p < 4 ==> res = x_].
+    hoare[F4.share_main : x = x_ /\ p = p_ /\ 0 <= p < n ==> res = x_].
 proof.
 proc.
 inline*.
 sp.
-(* ...and others are random *)
-seq 6 : (p < size shares /\ nth F4.err shares p = 0).
-auto.
-progress.
-rewrite size_put.
-smt().
-smt(nth_put put_nth).
-seq 2 : (sumz shares = x0).
-auto.
-progress.
-
-wp.
+seq 6 : (x0 = x_ /\ 0 <= p0 < n /\ size shares = n /\ nth F4.err shares p = 0).
+auto; progress.
+rewrite size_put; smt(_4p).
+rewrite nth_put; smt(_4p).
+seq 2 : (sumz shares = x_ /\ x0 = x_ /\ size shares = n).
+auto; progress.
+(* sum = x *)
+rewrite /put.
+rewrite H H1 H0 => /=.
+admit.
+rewrite size_put => //.
+(* matrix part *)
+auto. progress.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+simplify.
+(* sum is correct *)
+rewrite /sumz.
+rewrite _4p in H.
+(* something like this *)
+rewrite foldr_rcons.
 qed.
 
 (* Prove the sharing scheme is secure. *)

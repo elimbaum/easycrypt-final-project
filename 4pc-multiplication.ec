@@ -181,6 +181,33 @@ module F4 = {
   }
 }.
 
+lemma sum_four(s : int list, e : int) :
+    size s = 4 => sumz s = 
+    nth e s 0 + nth e s 1 + nth e s 2 + nth e s 3.
+proof.
+progress.
+rewrite /sumz -{1}take_size H.
+have T4 : take 4 s = rcons (take 3 s) (nth e s 3).
+  rewrite -take_nth.
+  rewrite H // take_nth.
+  by simplify.
+have T3 : take 3 s = rcons (take 2 s) (nth e s 2).
+  rewrite -take_nth.
+  rewrite H // take_nth.
+  by simplify.
+have T2 : take 2 s = rcons (take 1 s) (nth e s 1).
+  rewrite -take_nth.
+  rewrite H // take_nth.
+  by simplify.
+have T1 : take 1 s = rcons (take 0 s) (nth e s 0).
+  rewrite -take_nth.
+  rewrite H // take_nth.
+  by simplify.
+rewrite T4 T3 T2 T1 take0.  
+rewrite 4!foldr_rcons.
+smt().
+qed.
+
 (* Prove correctness of the sharing scheme. *)
 lemma share_correct(x_ p_ int) :
     hoare[F4.share_main : x = x_ /\ p = p_ /\ 0 <= p < n ==> res = x_].
@@ -192,11 +219,14 @@ seq 6 : (x0 = x_ /\ 0 <= p0 < n /\ size shares = n /\ nth F4.err shares p = 0).
 auto; progress.
 rewrite size_put; smt(_4p).
 rewrite nth_put; smt(_4p).
-seq 2 : (sumz shares = x_ /\ x0 = x_ /\ size shares = n).
+seq 1 : (sumz shares = x0 - s_ /\ x0 = x_  /\ size shares = n /\ 0 <= p0 < n).
+auto; progress.
+smt().
+seq 1 : (sumz shares = x_ /\ x0 = x_ /\ size shares = n).
 auto; progress.
 (* sum = x *)
 rewrite /put.
-rewrite H H1 H0 => /=.
+rewrite H0 H1 H2 => /=.
 admit.
 rewrite size_put => //.
 (* matrix part *)
@@ -211,10 +241,8 @@ rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
 simplify.
 (* sum is correct *)
-rewrite /sumz.
 rewrite _4p in H.
-(* something like this *)
-rewrite foldr_rcons.
+rewrite (sum_four shares{hr} F4.err{hr}) // /#.
 qed.
 
 (* Prove the sharing scheme is secure. *)

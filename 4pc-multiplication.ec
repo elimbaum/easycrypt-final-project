@@ -208,6 +208,12 @@ rewrite 4!foldr_rcons.
 smt().
 qed.
 
+lemma sum_replacement(shares : int list, i x e : int) :
+    0 <= i < size shares /\ nth e shares i = 0  => sumz (put shares i (x - sumz shares)) = x.
+proof.
+admit.
+qed.
+
 (* Prove correctness of the sharing scheme. *)
 lemma share_correct(x_ p_ int) :
     hoare[F4.share_main : x = x_ /\ p = p_ /\ 0 <= p < n ==> res = x_].
@@ -215,22 +221,38 @@ proof.
 proc.
 inline*.
 sp.
-seq 6 : (x0 = x_ /\ 0 <= p0 < n /\ size shares = n /\ nth F4.err shares p = 0).
+seq 6 : (x0 = x_
+  /\ 0 <= p0 < n
+  /\ size shares = n
+  /\ nth F4.err shares p0 = 0).
 auto; progress.
 rewrite size_put; smt(_4p).
 rewrite nth_put; smt(_4p).
-seq 1 : (sumz shares = x0 - s_ /\ x0 = x_  /\ size shares = n /\ 0 <= p0 < n).
+seq 1 : (
+  s_ = x0 - sumz shares
+  /\ x0 = x_ 
+  /\ size shares = n
+  /\ 0 <= p0 < n
+  /\ nth F4.err shares p0 = 0).
 auto; progress.
-smt().
-seq 1 : (sumz shares = x_ /\ x0 = x_ /\ size shares = n).
+seq 1 : (sumz shares = x_
+  /\ x0 = x_
+  /\ size shares = n
+  /\ nth F4.err shares p0 = 0).
 auto; progress.
 (* sum = x *)
-rewrite /put.
-rewrite H0 H1 H2 => /=.
+
+rewrite (sum_replacement shares{hr} p0{hr} x0{hr} F4.err{hr}).
+rewrite H0 H2 H H1 /= //.
+trivial.
+rewrite size_put //.
+rewrite nth_put.
+rewrite H0 H H1 //.
+simplify.
 admit.
-rewrite size_put => //.
 (* matrix part *)
 auto. progress.
+
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
 rewrite get_offunm.

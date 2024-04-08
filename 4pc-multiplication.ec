@@ -38,11 +38,18 @@ op randint : int distr.
 op n : int.
 axiom _4p : n = 4.
 
+op err : int.
+axiom _enz : err <> 0.
+
+op open(m : matrix) =
+    (* consistency check? or precondition? *)
+    (* add up party 0 shares, then add P1's x0... make this nicer? *)
+    m.[0, 1] + m.[0, 2] + m.[0, 3] + m.[1, 0].
+
 (* note: maybe use fset instead of list for party determination? *)
 
 module F4 = {
   var x : matrix
-  var err : int
 
   (* p has a value x and wants to share it with all other parties *)
   proc share(x p : int) : matrix = {
@@ -69,7 +76,6 @@ module F4 = {
         if p = s then 0 else ...
        maybe we can factor that out?
      *)
-    (* TODO oops need to factor in p. right now, fixing data owner. *)
     return offunm ((fun p s =>
         if p = s then 0 else (nth err shares s)), n, n);
   }
@@ -149,111 +155,118 @@ module F4 = {
     return m01 + m02 + m03 + m12 + m13 + m23 + mlocal;   
   }
 
-  proc open(m : matrix) : int = {
-    (* consistency check? or precondition? *)
-    (* add up party 0 shares, then add P1's x0... make this nicer? *)
-    return m.[0, 1] + m.[0, 2] + m.[0, 3] + m.[1, 0];
-  }
-
-  proc main(x y : int) : int = {
+  proc mult_main(x y : int) : int = {
     var z : int;
     var mx, my, mz : matrix;
 
-    (* assume P1 holds x and P2 holds y *)
-    mx <@ share(x, 1);
-    my <@ share(y, 2);
+    (* assume P0 holds x and P1 holds y *)
+    mx <@ share(x, 0);
+    my <@ share(y, 1);
 
     mz <@ mult(mx, my);
 
-    z <@ open(mz);
+    z <- open(mz);
 
     return z;
-    
   }
 
-  proc share_main(x p : int) : int = {
-    var m : matrix;
+  proc add_main(x y : int) : int = {
+    var mx, my, mz : matrix;
     var z : int;
-    
-    m <@ share(x, p);
-    z <@ open(m);
+
+    (* party 0 has x *)
+    mx <@ share(x, 0);
+    (* party 1 has y *)
+    my <@ share(y, 1);
+
+    (* addition is local *)
+    mz <- mx + my;
+
+    z <- open(mz);
     return z;
   }
 }.
 
-lemma sum_four(s : int list, e : int) :
+(* sum of four element list is the sum of the individual elements *)
+lemma sum_four(s : int list) :
     size s = 4 => sumz s = 
-    nth e s 0 + nth e s 1 + nth e s 2 + nth e s 3.
+    nth err s 0 + nth err s 1 + nth err s 2 + nth err s 3.
 proof.
 progress.
 rewrite /sumz -{1}take_size H.
-have T4 : take 4 s = rcons (take 3 s) (nth e s 3).
+have T4 : take 4 s = rcons (take 3 s) (nth err s 3).
   rewrite -take_nth.
   rewrite H // take_nth.
   by simplify.
-have T3 : take 3 s = rcons (take 2 s) (nth e s 2).
+have T3 : take 3 s = rcons (take 2 s) (nth err s 2).
   rewrite -take_nth.
   rewrite H // take_nth.
   by simplify.
-have T2 : take 2 s = rcons (take 1 s) (nth e s 1).
+have T2 : take 2 s = rcons (take 1 s) (nth err s 1).
   rewrite -take_nth.
   rewrite H // take_nth.
   by simplify.
-have T1 : take 1 s = rcons (take 0 s) (nth e s 0).
+have T1 : take 1 s = rcons (take 0 s) (nth err s 0).
   rewrite -take_nth.
   rewrite H // take_nth.
   by simplify.
-rewrite T4 T3 T2 T1 take0.  
-rewrite 4!foldr_rcons.
+rewrite T4 T3 T2 T1 take0.
 smt().
 qed.
 
-lemma sum_replacement(shares : int list, i x e : int) :
-    0 <= i < size shares /\ nth e shares i = 0  => sumz (put shares i (x - sumz shares)) = x.
+(* replacing zero value in list with `x` increases the sum by `x` *)
+lemma sum_replacement(shares : int list, i x : int) :
+    0 <= i < size shares /\ size shares = n /\ nth err shares i = 0  => sumz (put shares i x) = x + sumz shares.
 proof.
-admit.
+progress.
+rewrite _4p in H1.
+rewrite (sum_four shares) //.
+rewrite (sum_four (put shares i x)).
+by rewrite size_put.
+rewrite nth_put.
+smt().
+rewrite nth_put.
+smt().
+rewrite nth_put.
+smt().
+rewrite nth_put.
+smt().
+smt().
 qed.
 
 (* Prove correctness of the sharing scheme. *)
-lemma share_correct(x_ p_ int) :
-    hoare[F4.share_main : x = x_ /\ p = p_ /\ 0 <= p < n ==> res = x_].
+lemma share_correct(x_ p_ : int) :
+    hoare[F4.share : x = x_ /\ p = p_ /\ 0 <= p < n ==> open res = x_].
 proof.
 proc.
 inline*.
 sp.
-seq 6 : (x0 = x_
-  /\ 0 <= p0 < n
+seq 6 : (x = x_
+  /\ 0 <= p < n
   /\ size shares = n
-  /\ nth F4.err shares p0 = 0).
+  /\ nth err shares p = 0).
 auto; progress.
 rewrite size_put; smt(_4p).
 rewrite nth_put; smt(_4p).
 seq 1 : (
-  s_ = x0 - sumz shares
-  /\ x0 = x_ 
+  s_ = x - sumz shares
+  /\ x = x_ 
   /\ size shares = n
-  /\ 0 <= p0 < n
-  /\ nth F4.err shares p0 = 0).
+  /\ 0 <= p < n
+  /\ nth err shares p = 0).
 auto; progress.
 seq 1 : (sumz shares = x_
-  /\ x0 = x_
-  /\ size shares = n
-  /\ nth F4.err shares p0 = 0).
+  /\ x = x_
+  /\ size shares = n).
 auto; progress.
 (* sum = x *)
-
-rewrite (sum_replacement shares{hr} p0{hr} x0{hr} F4.err{hr}).
-rewrite H0 H2 H H1 /= //.
-trivial.
+rewrite (sum_replacement shares{hr} p{hr} (x{hr} - sumz shares{hr})).
+by rewrite H0 H2 H H1 /= // _enz.
+smt().
 rewrite size_put //.
-rewrite nth_put.
-rewrite H0 H H1 //.
-simplify.
-admit.
 (* matrix part *)
 auto. progress.
-
-rewrite get_offunm.
+rewrite /open get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
@@ -264,37 +277,91 @@ rewrite rows_offunm cols_offunm => /=; smt(_4p).
 simplify.
 (* sum is correct *)
 rewrite _4p in H.
-rewrite (sum_four shares{hr} F4.err{hr}) // /#.
+rewrite (sum_four shares{hr}) // /#.
 qed.
 
 (* Prove the sharing scheme is secure. *)
 
 (* need lemma valid shares *)
 
-lemma mul_correct(x_ y_ : int) :
-    hoare[F4.main : x = x_ /\ y = y_ ==> res = x_ * y_].
+(* Prove addition is correct *)
+lemma add_correct(x_ y_ : int) :
+    hoare[F4.add_main : x = x_ /\ y = y_ ==> res = x_ + y_].
 proof.
 proc.
-(* call - how to use invariants?
-   or is inline ok?
-   need to reason about uniform randomness: argue indist. from rand submatrix *)
-inline F4.open.
-wp.
-seq 1 : (mx).
-inline F4.mult.
-wp.
-inline (6) F4.inp.
-
-inline (1) F4.share.
-sp.
-seq 1 : (true).
-rnd.
-rewrite /randint.
-
+have n4 : n = 4 by rewrite _4p.
+seq 1 : (open mx = x_ /\ y = y_).
 auto.
-call (_: true).
+call (share_correct x_ 0).
+auto; smt().
+seq 1 : (open my = y_ /\ open mx = x_).
+call (share_correct y_ 1).
+auto; progress.
+smt().
+auto.
+progress.
+by rewrite /open 4!get_addm /#.
+qed.
 
-sp.
+lemma excluded_party (i j : int) :
+    exists(a, b : int),  a < b /\ a <> i /\ b <> j /\ 0 <= i < j < n 
+      => (rem i (rem j (range 0 n))) = [a; b].
+proof.
+rewrite _4p.
+(* i = 0 *)
+case (i = 0).
+case (j = 1); progress.
+exists 2 3.
+rewrite /= range_ltn // range_ltn // range_ltn // rangeS //.
+case (j = 2); progress.
+exists 1 3.
+rewrite /= range_ltn // range_ltn // range_ltn // rangeS //.
+exists 1 2.
+rewrite /= range_ltn // range_ltn // range_ltn // rangeS.
+progress.
+have // : j = 3 by smt().
+(* i = 1 *)
+case (i = 1).
+case (j = 2); progress.
+exists 0 3.
+rewrite /= range_ltn // range_ltn // range_ltn // rangeS //.
+exists 0 2.
+rewrite /= range_ltn // range_ltn // range_ltn // rangeS //.
+progress.
+have // : j = 3 by smt().
+(* i = 2 *)
+progress.
+exists 0 1.
+rewrite /= range_ltn // range_ltn // range_ltn // rangeS //.
+progress.
+have // : i = 2 /\ j = 3 by smt().
+qed.
+
+(* Prove multiplication is correct *)
+lemma mul_correct(x_ y_ : int) :
+    hoare[F4.mult_main : x = x_ /\ y = y_ ==> res = x_ * y_].
+proof.
+proc.
+have n4 : n = 4 by rewrite _4p.
+seq 1 : (open mx = x_ /\ y = y_).
+auto.
+call (share_correct x_ 0).
+auto; smt().
+seq 1 : (open mx = x_ /\ open my = y_).
+auto.
+call (share_correct y_ 1).
+auto; smt().
+inline F4.mult.
+wp; sp.
+seq 1 : (open m23 = mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1]).
+inline F4.inp.
+seq 6 : (x1 = mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1]
+  /\ i = 2 /\ j = 3 /\ g = 0 /\ h = 1).
+auto.
+progress.
+rewrite n4.
+have : rem 2 (rem 3 (range 0 4)) = [0; 1].
+rewrite (excluded_party 2 3).
 
 qed.
 

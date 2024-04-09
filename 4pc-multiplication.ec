@@ -49,8 +49,6 @@ op open(m : matrix) =
 (* note: maybe use fset instead of list for party determination? *)
 
 module F4 = {
-  var x : matrix
-
   (* p has a value x and wants to share it with all other parties *)
   proc share(x p : int) : matrix = {
     var s0, s1, s2, s_, s3 : int;
@@ -152,7 +150,7 @@ module F4 = {
     return m01 + m02 + m03 + m12 + m13 + m23 + mlocal;   
   }
 
-  proc mult_main(x y : int) : int = {
+  proc mult_main(x y : int) : matrix = {
     var z : int;
     var mx, my, mz : matrix;
 
@@ -162,9 +160,7 @@ module F4 = {
 
     mz <@ mult(mx, my);
 
-    z <- open(mz);
-
-    return z;
+    return mz;
   }
 
   proc add_main(x y : int) : int = {
@@ -237,8 +233,6 @@ lemma share_correct(x_ p_ : int) :
     hoare[F4.share : x = x_ /\ p = p_ /\ 0 <= p < N ==> open res = x_].
 proof.
 proc.
-inline*.
-sp.
 seq 6 : (x = x_
   /\ 0 <= p < N
   /\ size shares = N
@@ -380,20 +374,19 @@ qed.
 
 (* Prove multiplication is correct *)
 lemma mul_correct(x_ y_ : int) :
-    hoare[F4.mult_main : x = x_ /\ y = y_ ==> res = x_ * y_].
+    hoare[F4.mult_main : x = x_ /\ y = y_ ==> open res = x_ * y_].
 proof.
 proc.
 have n4 : N = 4 by rewrite _4p.
-
 seq 1 : (open mx = x_ /\ y = y_).
 auto.
 call (share_correct x_ 0).
 auto; smt().
-
 seq 1 : (open mx = x_ /\ open my = y_).
 auto.
 call (share_correct y_ 1).
 auto; smt().
+wp.
 inline F4.mult.
 wp; sp.
 

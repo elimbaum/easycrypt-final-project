@@ -1,6 +1,6 @@
 prover quorum=2 ["Alt-Ergo" "Z3"].
 timeout 1.  (* limit SMT solvers to two seconds *)
-require import AllCore Distr List.
+require import AllCore Distr List FSet.
 
 
 require (*---*) DynMatrix.
@@ -35,8 +35,8 @@ op randint : int distr.
 (* matrix semantics are [party, share] *)
 
 (* We have four parties. *)
-op n : int.
-axiom _4p : n = 4.
+op N : int.
+axiom _4p : N = 4.
 
 op err : int.
 axiom _enz : err <> 0.
@@ -77,7 +77,7 @@ module F4 = {
        maybe we can factor that out?
      *)
     return offunm ((fun p s =>
-        if p = s then 0 else (nth err shares s)), n, n);
+        if p = s then 0 else (nth err shares s)), N, N);
   }
 
   (* parties si and sj know x, and want to send it to party d.
@@ -89,16 +89,13 @@ module F4 = {
     var g : int;
 
     (* compute the excluded party g *)
-    var p : int list;
-    (* list 0..n *)
-    p <- range 0 n;
+    var p : party fset;
     (* remove current parties *)
-    p <- rem si (rem sj (rem d p));
-    g <- head err p;
+    g <- pick ((rangeset 0 N) `\` oflist [si; sj; d]);
 
     return offunm ((fun p s =>
         if p = s then 0 else
-        if g = s then x else 0), n, n);
+        if g = s then x else 0), N, N);
   }
 
   (* parties i and j know x, and want to share it with the two other
@@ -110,10 +107,10 @@ module F4 = {
     var pgm : matrix;
 
     (* figure out excluded parties g, h *)
-    var p : int list;
-    p <- rem i (rem j (range 0 n));
-    g <- nth err p 0;
-    h <- nth err p 1;
+    var p : party fset;
+    p <- (rangeset 0 N) `\` oflist [i; j];
+    g <- nth err (elems p) 0;
+    h <- nth err (elems p) 1;
 
     (* in the paper this is a PRF, but for now model as truly random
        and just don't give it to party g. *)
@@ -127,7 +124,7 @@ module F4 = {
     (* xi = xj = 0, xg = r, xh = x - r *)
     return pgm + offunm ((fun p s => 
       if s = p then 0 else
-      if s = g then r else 0), n, n);
+      if s = g then r else 0), N, N);
   }
 
   proc mult(x y : matrix) : matrix = {
@@ -187,6 +184,7 @@ module F4 = {
   }
 }.
 
+
 (* sum of four element list is the sum of the individual elements *)
 lemma sum_four(s : int list) :
     size s = 4 => sumz s = 
@@ -216,7 +214,7 @@ qed.
 
 (* replacing zero value in list with `x` increases the sum by `x` *)
 lemma sum_replacement(shares : int list, i x : int) :
-    0 <= i < size shares /\ size shares = n /\ nth err shares i = 0  => sumz (put shares i x) = x + sumz shares.
+    0 <= i < size shares /\ size shares = N /\ nth err shares i = 0  => sumz (put shares i x) = x + sumz shares.
 proof.
 progress.
 rewrite _4p in H1.
@@ -236,14 +234,14 @@ qed.
 
 (* Prove correctness of the sharing scheme. *)
 lemma share_correct(x_ p_ : int) :
-    hoare[F4.share : x = x_ /\ p = p_ /\ 0 <= p < n ==> open res = x_].
+    hoare[F4.share : x = x_ /\ p = p_ /\ 0 <= p < N ==> open res = x_].
 proof.
 proc.
 inline*.
 sp.
 seq 6 : (x = x_
-  /\ 0 <= p < n
-  /\ size shares = n
+  /\ 0 <= p < N
+  /\ size shares = N
   /\ nth err shares p = 0).
 auto; progress.
 rewrite size_put; smt(_4p).
@@ -251,13 +249,13 @@ rewrite nth_put; smt(_4p).
 seq 1 : (
   s_ = x - sumz shares
   /\ x = x_ 
-  /\ size shares = n
-  /\ 0 <= p < n
+  /\ size shares = N
+  /\ 0 <= p < N
   /\ nth err shares p = 0).
 auto; progress.
 seq 1 : (sumz shares = x_
   /\ x = x_
-  /\ size shares = n).
+  /\ size shares = N).
 auto; progress.
 (* sum = x *)
 rewrite (sum_replacement shares{hr} p{hr} (x{hr} - sumz shares{hr})).
@@ -289,7 +287,7 @@ lemma add_correct(x_ y_ : int) :
     hoare[F4.add_main : x = x_ /\ y = y_ ==> res = x_ + y_].
 proof.
 proc.
-have n4 : n = 4 by rewrite _4p.
+have n4 : N = 4 by rewrite _4p.
 seq 1 : (open mx = x_ /\ y = y_).
 auto.
 call (share_correct x_ 0).
@@ -303,38 +301,81 @@ progress.
 by rewrite /open 4!get_addm /#.
 qed.
 
+lemma range4 :
+    range 0 4 = [0; 1; 2; 3].
+proof.
+by rewrite range_ltn // range_ltn // range_ltn // rangeS.
+qed.
+
 lemma excluded_party (i j : int) :
-    exists(a, b : int),  a < b /\ a <> i /\ b <> j /\ 0 <= i < j < n 
-      => (rem i (rem j (range 0 n))) = [a; b].
+    exists(a, b : int),  a < b /\ a <> i /\ b <> j /\ 0 <= i < j < N 
+      => (rem i (rem j (range 0 N))) = [a; b].
 proof.
 rewrite _4p.
 (* i = 0 *)
 case (i = 0).
 case (j = 1); progress.
 exists 2 3.
-rewrite /= range_ltn // range_ltn // range_ltn // rangeS //.
+by rewrite range4.
 case (j = 2); progress.
 exists 1 3.
-rewrite /= range_ltn // range_ltn // range_ltn // rangeS //.
+by rewrite range4.
 exists 1 2.
-rewrite /= range_ltn // range_ltn // range_ltn // rangeS.
+rewrite range4 /=.
 progress.
 have // : j = 3 by smt().
 (* i = 1 *)
 case (i = 1).
 case (j = 2); progress.
 exists 0 3.
-rewrite /= range_ltn // range_ltn // range_ltn // rangeS //.
+by rewrite range4.
 exists 0 2.
-rewrite /= range_ltn // range_ltn // range_ltn // rangeS //.
+rewrite range4 /=.
 progress.
 have // : j = 3 by smt().
 (* i = 2 *)
 progress.
 exists 0 1.
-rewrite /= range_ltn // range_ltn // range_ltn // rangeS //.
+rewrite range4 /=.
 progress.
 have // : i = 2 /\ j = 3 by smt().
+qed.
+
+lemma pick_nonmem (s : party fset) :
+    forall k, k \in s => pick (rangeset 0 N `\` s) <> k.
+proof.
+admit.
+qed.
+(*progress.
+rewrite /pick.
+rewrite /(`\`).
+rewrite /rangeset.
+have : uniq (range 0 n).
+  by rewrite range_uniq.
+progress.
+rewrite oflist_uniq in H0.*)
+
+lemma offunm_unwrap (i, j : int, f : int -> int -> int):
+    0 <= i < N /\ 0 <= j < N => (offunm (fun(x y) => f x y, N, N)).[i, j] = f i j.
+proof.
+progress.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm H H1 /=.
+move : H0 H2.
+by rewrite _4p.
+by simplify.
+qed.
+
+lemma nth_set (i : int, s : int list) :
+  uniq s => nth err (elems (oflist s)) i = nth err s i.
+proof.
+admit.
+qed.
+
+lemma oflist_cat (a b c : int list) :
+    a ++ b = c => oflist c `\` oflist b = oflist a.
+proof.
+admit.
 qed.
 
 (* Prove multiplication is correct *)
@@ -342,26 +383,93 @@ lemma mul_correct(x_ y_ : int) :
     hoare[F4.mult_main : x = x_ /\ y = y_ ==> res = x_ * y_].
 proof.
 proc.
-have n4 : n = 4 by rewrite _4p.
+have n4 : N = 4 by rewrite _4p.
+
 seq 1 : (open mx = x_ /\ y = y_).
 auto.
 call (share_correct x_ 0).
 auto; smt().
+
 seq 1 : (open mx = x_ /\ open my = y_).
 auto.
 call (share_correct y_ 1).
 auto; smt().
 inline F4.mult.
 wp; sp.
+
 seq 1 : (open m23 = mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1]).
 inline F4.inp.
-seq 6 : (x1 = mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1]
-  /\ i = 2 /\ j = 3 /\ g = 0 /\ h = 1).
+
+seq 4 : (x1 = mx.[0,1]*my.[1,0] + mx.[1,0]*my.[0,1] /\ i = 2 /\ j = 3 /\ p = oflist [0; 1]).
 auto.
 progress.
 rewrite n4.
-have : rem 2 (rem 3 (range 0 4)) = [0; 1].
-rewrite (excluded_party 2 3).
+rewrite /rangeset.
+rewrite range4.
+by rewrite (oflist_cat [0; 1] [2; 3] [0; 1; 2; 3]).
+
+seq 2 : (x1 = mx.[0,1]*my.[1,0] + mx.[1,0]*my.[0,1] /\ i = 2 /\ j = 3 /\ g = 0 /\ h = 1).
+auto.
+progress.
+by rewrite nth_set.
+by rewrite nth_set.
+
+seq 2 : (xh = x1 - r /\ i = 2 /\ j = 3 /\ g = 0 /\ h = 1); auto.
+inline F4.jmp.
+auto; progress.
+rewrite /open n4 /rangeset range4.
+rewrite (oflist_cat [1] [2; 3; 0] [0; 1; 2; 3])
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /#.
+simplify.
+
+rewrite (offunm_unwrap 0 1 (fun (p1 s : int) =>
+      if p1 = s then 0
+      else
+        if pick (rangeset 0 4 `\` oflist [2; 3; 0]) = s then
+          (x1{hr} - r{hr})%Mat_A.ZR
+        else 0)).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /#.
+simplify.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /#.
+simplify.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /#.
+simplify.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /#.
+simplify.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /#.
+simplify.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /#.
+simplify.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /#.
+simplify.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /#.
+simplify.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /#.
+simplify.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /#.
+simplify.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /#.
+simplify.
+
+rewrite pick_nonmem.
+have no1 : 1 \notin oflist [2; 3; 0].
+rewrite (mem_oflist).
+smt().
+
+rewrite rem23 /=.
+smt().
 
 qed.
 

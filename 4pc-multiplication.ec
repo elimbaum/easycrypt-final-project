@@ -29,6 +29,22 @@ type party = int.
 import Mat_A.Matrices.
 
 op randint : int distr.
+axiom randint_ll : is_lossless randint.
+
+(* bitwidth of int *)
+op L : int.
+axiom ge0_L : 0 <= L.
+
+axiom randint1E (x : int) :
+  mu1 randint x = 1%r / (2 ^ L)%r.
+
+(* from SMC example in class *)
+lemma rantint_full : is_full randint.
+proof.
+move => x.
+rewrite /support randint1E.
+by rewrite RField.div1r StdOrder.RealOrder.invr_gt0 lt_fromint StdOrder.IntOrder.expr_gt0.
+qed.
 
 (* WARNING: matrices are zero indexed, so we need to have share 0, party 0 *)
 
@@ -38,6 +54,7 @@ op randint : int distr.
 op N : int.
 axiom _4p : N = 4.
 
+(* An unspecified non-zero error value *)
 op err : int.
 axiom _enz : err <> 0.
 
@@ -47,6 +64,24 @@ op open(m : matrix) =
     m.[0, 1] + m.[0, 2] + m.[0, 3] + m.[1, 0].
 
 (* note: maybe use fset instead of list for party determination? *)
+
+module Sim = {
+  (* simulator ignores x and p and just returns a random sharing
+     we will argue that all rows of the matrix (parties' views)
+     are indistinguishable. *)
+  proc share(x_ p_ : int) : matrix = {
+    var s0, s1, s2, s3 : int;
+
+    (* generate random *)
+    s0 <$ randint;
+    s1 <$ randint;
+    s2 <$ randint;
+    s3 <$ randint;
+
+    return offunm ((fun p s =>
+        if p = s then 0 else (nth err [s0; s1; s2; s3] s)), N, N);
+  }
+}.
 
 module F4 = {
   (* p has a value x and wants to share it with all other parties *)
@@ -273,6 +308,50 @@ rewrite (sum_four shares{hr}) // /#.
 qed.
 
 (* Prove the sharing scheme is secure. *)
+lemma share_secure :
+    equiv[F4.share ~ Sim.share : 0 <= p{1} < N ==> ={res}].
+proof.
+proc.
+(* si are all random *)
+seq 4 4 : (
+  s0{1} \in randint /\ ={s0} /\
+  s1{1} \in randint /\ ={s1} /\
+  s2{1} \in randint /\ ={s2} /\
+  s3{1} \in randint /\ ={s3} /\
+  0 <= p{1} < N
+).
+auto.
+auto.
+progress.
+(* rewrite matrices *)
+rewrite put_in.
+rewrite size_put.
+smt(_4p).
+(* convert matrix to function evaluation *)
+rewrite eq_matrixP.
+rewrite 2!rows_offunm 2!cols_offunm _4p /max => /=.
+progress.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt().
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt().
+simplify.
+(* trivial when i = j => diagonal, so zero * )
+
+case (i = j) => [// | off_diag].
+case (j = 1) => j1.
+rewrite j1.
+rewrite take_put.
+simplify.
+rewrite drop_put_out.
+smt().
+
+rewrite drop_put_out.
+smt().
+rewrite take_put.
+simplify. *)
+admit.
+qed.
 
 (* need lemma valid shares *)
 
@@ -335,12 +414,12 @@ progress.
 have // : i = 2 /\ j = 3 by smt().
 qed.
 
-lemma pick_nonmem (s : party fset) :
+(* lemma pick_nonmem (s : party fset) :
     forall k, k \in s => pick (rangeset 0 N `\` s) <> k.
 proof.
 admit.
 qed.
-(*progress.
+( *progress.
 rewrite /pick.
 rewrite /(`\`).
 rewrite /rangeset.
@@ -360,6 +439,7 @@ by rewrite _4p.
 by simplify.
 qed.
 
+(*
 lemma nth_set (i : int, s : int list) :
   uniq s => nth err (elems (oflist s)) i = nth err s i.
 proof.
@@ -370,7 +450,7 @@ lemma oflist_cat (a b c : int list) :
     a ++ b = c => oflist c `\` oflist b = oflist a.
 proof.
 admit.
-qed.
+qed.*)
 
 (* Prove multiplication is correct *)
 lemma mul_correct(x_ y_ : int) :
@@ -411,17 +491,9 @@ seq 2 : (xh = x1 - r /\ i = 2 /\ j = 3 /\ g = 0 /\ h = 1); auto.
 inline F4.jmp.
 auto; progress.
 rewrite /open n4 /rangeset range4.
-rewrite (oflist_cat [1] [2; 3; 0] [0; 1; 2; 3])
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /#.
 simplify.
-
-rewrite (offunm_unwrap 0 1 (fun (p1 s : int) =>
-      if p1 = s then 0
-      else
-        if pick (rangeset 0 4 `\` oflist [2; 3; 0]) = s then
-          (x1{hr} - r{hr})%Mat_A.ZR
-        else 0)).
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /#.
 simplify.
@@ -456,7 +528,7 @@ rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /#.
 simplify.
 
-rewrite pick_nonmem.
+
 have no1 : 1 \notin oflist [2; 3; 0].
 rewrite (mem_oflist).
 smt().

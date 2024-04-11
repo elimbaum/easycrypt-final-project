@@ -103,7 +103,6 @@ module F4 = {
         if p = s then 0 else
         if g = s then x else 0), N, N);
     
-
       (*FOR CHEATING IDENTIFICATION: Model H as a random oracle and have a map to save the value for x.
       When g checks the value for x if x is in the map then return the same value 
       otherwise return a new value*)

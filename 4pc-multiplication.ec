@@ -27,6 +27,7 @@ ZR.mulrDl by exact mulrDl.
 type party = int.
 
 import Mat_A.Matrices.
+import Mat_A.Vectors.
 
 op randint : int distr.
 axiom randint_ll : is_lossless randint.
@@ -65,12 +66,16 @@ op open(m : matrix) =
 
 (* note: maybe use fset instead of list for party determination? *)
 
+op view(m : matrix, p : party) =
+  row m p.
+
 module Sim = {
   (* simulator ignores x and p and just returns a random sharing
      we will argue that all rows of the matrix (parties' views)
      are indistinguishable. *)
-  proc share(x_ p_ : int) : matrix = {
+  proc share(x : int, p : party) : matrix = {
     var s0, s1, s2, s3 : int;
+    var rm : matrix;
 
     (* generate random *)
     s0 <$ randint;
@@ -78,14 +83,14 @@ module Sim = {
     s2 <$ randint;
     s3 <$ randint;
 
-    return offunm ((fun p s =>
-        if p = s then 0 else (nth err [s0; s1; s2; s3] s)), N, N);
+    return offunm ((fun p_ s =>
+        if p_ = s then 0 else (nth err [s0; s1; s2; s3] s)), N, N);
   }
 }.
 
 module F4 = {
   (* p has a value x and wants to share it with all other parties *)
-  proc share(x p : int) : matrix = {
+  proc share(x : int, p : party) : matrix = {
     var s0, s1, s2, s_, s3 : int;
 
     var shares : int list;
@@ -106,11 +111,11 @@ module F4 = {
 
     (* TODO: think about if we should use vector here instead of list *)
     (* TODO: basically every `offunm` call is going to have the structure
-        if p = s then 0 else ...
+        if p_ = s then 0 else ...
        maybe we can factor that out?
      *)
-    return offunm ((fun p s =>
-        if p = s then 0 else (nth err shares s)), N, N);
+    return offunm ((fun p_ s =>
+        if p_ = s then 0 else (nth err shares s)), N, N);
   }
 
   (* parties si and sj know x, and want to send it to party d.
@@ -124,7 +129,7 @@ module F4 = {
     (* compute the excluded party g *)
     var p : party fset;
     (* remove current parties *)
-    g <- pick ((rangeset 0 N) `\` oflist [si; sj; d]);
+    g <- pick ((rangeset 0 N) `\` Top.FSet.oflist [si; sj; d]);
 
     return offunm ((fun p s =>
         if p = s then 0 else
@@ -141,7 +146,7 @@ module F4 = {
 
     (* figure out excluded parties g, h *)
     var p : party fset;
-    p <- (rangeset 0 N) `\` oflist [i; j];
+    p <- (rangeset 0 N) `\` Top.FSet.oflist [i; j];
     g <- nth err (elems p) 0;
     h <- nth err (elems p) 1;
 
@@ -264,14 +269,13 @@ smt().
 qed.
 
 (* Prove correctness of the sharing scheme. *)
-lemma share_correct(x_ p_ : int) :
-    hoare[F4.share : x = x_ /\ p = p_ /\ 0 <= p < N ==> open res = x_].
+lemma share_correct(x_ : int, p_ : party) :
+    hoare[F4.share: x = x_ /\ p = p_ /\ 0 <= p_ < N ==> open res = x_].
 proof.
 proc.
-seq 6 : (x = x_
-  /\ 0 <= p < N
+seq 6 : (x = x_ /\ p = p_ /\ 0 <= p_ < N
   /\ size shares = N
-  /\ nth err shares p = 0).
+  /\ nth err shares p_ = 0).
 auto; progress.
 rewrite size_put; smt(_4p).
 rewrite nth_put; smt(_4p).
@@ -308,49 +312,92 @@ rewrite (sum_four shares{hr}) // /#.
 qed.
 
 (* Prove the sharing scheme is secure. *)
-lemma share_secure :
-    equiv[F4.share ~ Sim.share : 0 <= p{1} < N ==> ={res}].
+lemma share_secure(p_ : party) :
+    equiv[F4.share ~ Sim.share :
+      ={p} /\ p{1} = p_ /\ 0 <= p_ < N
+      ==>
+      view res{1} p_ = view res{2} p_].
 proof.
 proc.
 (* si are all random *)
-seq 4 4 : (
+seq 4 4 : (={p} /\ p{1} = p_ /\
   s0{1} \in randint /\ ={s0} /\
   s1{1} \in randint /\ ={s1} /\
   s2{1} \in randint /\ ={s2} /\
   s3{1} \in randint /\ ={s3} /\
-  0 <= p{1} < N
+  0 <= p_ < N
 ).
 auto.
 auto.
 progress.
+pose shares := [s0{2}; s1{2}; s2{2}; s3{2}].
+have sz_shares : size shares = 4.
+  (* ??? *)
+  admit.
+rewrite _4p in H4.
 (* rewrite matrices *)
 rewrite put_in.
-rewrite size_put.
-smt(_4p).
-(* convert matrix to function evaluation *)
-rewrite eq_matrixP.
-rewrite 2!rows_offunm 2!cols_offunm _4p /max => /=.
+by rewrite size_put.
+(* convert view of matrix to vector *)
+rewrite /view.
+rewrite /row.
+rewrite 2!cols_offunm.
+rewrite _4p lez_maxr //.
+rewrite eq_vectorP.
+rewrite 2!size_offunv lez_maxr // /=.
+move => i i_bounded.
+rewrite get_offunv // get_offunv //.
+(* evaluate function calls *)
+simplify.
+(* convert back to matrix *)
+rewrite get_offunm.
+rewrite rows_offunm lez_maxr // cols_offunm lez_maxr //.
+rewrite get_offunm.
+rewrite rows_offunm lez_maxr // cols_offunm lez_maxr //.
 progress.
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm => /=; smt().
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm => /=; smt().
-simplify.
-(* trivial when i = j => diagonal, so zero * )
-
-case (i = j) => [// | off_diag].
-case (j = 1) => j1.
-rewrite j1.
-rewrite take_put.
-simplify.
-rewrite drop_put_out.
+(* trivial when p = i => diagonal, so zero *)
+case (p{2} = i) => [// | off_diag].
+(* off diagonal: shares are indistinguishable *)
+rewrite nth_cat.
+rewrite size_take //.
+rewrite size_put.
+rewrite sz_shares H4 /=.
+(* one side of diagonal *)
+case (p{2} < i) => [plti | pgteqi].
+have inltp : !(i < p{2}).
+  smt().
+rewrite inltp /=.
+rewrite nth_drop.
 smt().
-
-rewrite drop_put_out.
 smt().
-rewrite take_put.
-simplify. *)
-admit.
+have ip2n0 : i - p{2} <> 0.
+  smt().
+rewrite ip2n0 /=.
+rewrite nth_put.
+by rewrite sz_shares H3 H4.
+have simp_mat_add : i = p{2} + 1 + (i - p{2} - 1)%Mat_A.ZR.
+  smt(addrA addrC).
+rewrite -simp_mat_add off_diag /=.
+(* expansion of nth - skipping *)
+case (i = 0) => i0.
+rewrite i0 //.
+case (i = 1) => i1.
+rewrite i1 //.
+case (i = 2) => i2.
+rewrite i2 //.
+have i3 : (i = 3).
+smt().
+rewrite i3 //.
+(* other side of diagonal *)
+have iltp : i < p{2}.
+  smt().
+rewrite iltp  /=.
+rewrite nth_take.
+rewrite H3.
+rewrite iltp.
+rewrite nth_put.
+rewrite H3 sz_shares H4 //.
+rewrite off_diag //.
 qed.
 
 (* need lemma valid shares *)

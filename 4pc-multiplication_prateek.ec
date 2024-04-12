@@ -302,7 +302,10 @@ rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
+
+
 simplify.
+
 (* sum is correct *)
 rewrite _4p in H.
 rewrite (sum_four shares{hr}) // /#.
@@ -397,21 +400,32 @@ by simplify.
 qed.
 
 
+lemma nth_set (i : int, s : int list) :
+  uniq s => nth err (elems (oflist s)) i = nth err s i.
+proof.
+admit.
+qed.
 
 
 
 (* Prove correctness of the jmp scheme. *)
 lemma jmp_correct(x_ : int) :
-    hoare[F4.jmp : x = x_ /\ si = 0 /\ sj = 1 /\ d = 2 ==> sum_matrix res = 3 * x_].
+    hoare[F4.jmp : x = x_ /\ si = 0 /\ sj = 1 /\ d = 2 ==> open res = x_].
 proof.
 proc.
 auto => />.
-rewrite /sum_matrix.
 rewrite _4p.
 
-
-
-
+rewrite /open.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+simplify.
 
 
 (*
@@ -464,17 +478,7 @@ qed.
 
 
 
-lemma nth_set (i : int, s : int list) :
-  uniq s => nth err (elems (oflist s)) i = nth err s i.
-proof.
-admit.
-qed.
 
-lemma oflist_cat (a b c : int list) :
-    a ++ b = c => oflist c `\` oflist b = oflist a.
-proof.
-admit.
-qed.
 
 
 

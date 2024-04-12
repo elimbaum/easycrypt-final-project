@@ -75,7 +75,7 @@ module Sim = {
      are indistinguishable. *)
   proc share(x : int, p : party) : matrix = {
     var s0, s1, s2, s3 : int;
-    var rm : matrix;
+    var shares : int list;
 
     (* generate random *)
     s0 <$ randint;
@@ -83,8 +83,10 @@ module Sim = {
     s2 <$ randint;
     s3 <$ randint;
 
+    shares <- [s0; s1; s2; s3];
+
     return offunm ((fun p_ s =>
-        if p_ = s then 0 else (nth err [s0; s1; s2; s3] s)), N, N);
+        if p_ = s then 0 else (nth err shares s)), N, N);
   }
 }.
 
@@ -320,29 +322,25 @@ lemma share_secure(p_ : party) :
 proof.
 proc.
 (* si are all random *)
-seq 4 4 : (={p} /\ p{1} = p_ /\
+seq 5 5 : (={p} /\ p{1} = p_ /\
   s0{1} \in randint /\ ={s0} /\
   s1{1} \in randint /\ ={s1} /\
   s2{1} \in randint /\ ={s2} /\
   s3{1} \in randint /\ ={s3} /\
-  0 <= p_ < N
+  0 <= p_ < N /\
+  size shares{2} = 4 /\ ={shares}
 ).
 auto.
+progress.
 auto.
 progress.
-pose shares := [s0{2}; s1{2}; s2{2}; s3{2}].
-have sz_shares : size shares = 4.
-  (* ??? *)
-  admit.
 rewrite _4p in H4.
 (* rewrite matrices *)
 rewrite put_in.
-by rewrite size_put.
+by rewrite size_put H5.
 (* convert view of matrix to vector *)
-rewrite /view.
-rewrite /row.
-rewrite 2!cols_offunm.
-rewrite _4p lez_maxr //.
+rewrite /view /row.
+rewrite 2!cols_offunm _4p lez_maxr //.
 rewrite eq_vectorP.
 rewrite 2!size_offunv lez_maxr // /=.
 move => i i_bounded.
@@ -361,7 +359,7 @@ case (p{2} = i) => [// | off_diag].
 rewrite nth_cat.
 rewrite size_take //.
 rewrite size_put.
-rewrite sz_shares H4 /=.
+rewrite H5 H4 /=.
 (* one side of diagonal *)
 case (p{2} < i) => [plti | pgteqi].
 have inltp : !(i < p{2}).
@@ -374,29 +372,19 @@ have ip2n0 : i - p{2} <> 0.
   smt().
 rewrite ip2n0 /=.
 rewrite nth_put.
-by rewrite sz_shares H3 H4.
+by rewrite H5 H3 H4.
 have simp_mat_add : i = p{2} + 1 + (i - p{2} - 1)%Mat_A.ZR.
   smt(addrA addrC).
-rewrite -simp_mat_add off_diag /=.
-(* expansion of nth - skipping *)
-case (i = 0) => i0.
-rewrite i0 //.
-case (i = 1) => i1.
-rewrite i1 //.
-case (i = 2) => i2.
-rewrite i2 //.
-have i3 : (i = 3).
-smt().
-rewrite i3 //.
+by rewrite -simp_mat_add off_diag /=.
 (* other side of diagonal *)
 have iltp : i < p{2}.
   smt().
-rewrite iltp  /=.
+rewrite iltp /=.
 rewrite nth_take.
 rewrite H3.
 rewrite iltp.
 rewrite nth_put.
-rewrite H3 sz_shares H4 //.
+rewrite H3 H5 H4 //.
 rewrite off_diag //.
 qed.
 

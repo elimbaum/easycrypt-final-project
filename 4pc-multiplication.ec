@@ -486,7 +486,6 @@ have : uniq (range 0 n).
 progress.
 rewrite oflist_uniq in H0.
 
-
 lemma nth_set (i : int, s : int list) :
   uniq s => nth err (elems (oflist s)) i = nth err s i.
 proof.

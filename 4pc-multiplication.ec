@@ -574,17 +574,18 @@ wp; sp.
 
 
 (*proof for m23 inp call*)
-seq 1 : ( x0 = mx /\ y0 = my /\ open mx = x_ /\ open my = y_ /\
+seq 1 : ( x0 = mx /\ y0 = my /\ x_ = open mx /\ y_ = open my /\
   open m23 = mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1]).
 
 inline F4.inp.
 wp;sp.
+
 seq 2:  (
   x1 = x0.[0, 1] * y0.[1, 0] + x0.[1, 0] * y0.[0, 1] /\
   i = 2 /\
   j = 3 /\
   g = 0 /\ h = 1 /\ x0 = mx /\ y0 = my /\ 
-  open mx = x_ /\ open my = y_ /\  
+  x_ = open mx /\ y_ = open my /\  
   xh = x1 - r) .
 auto => />.
 progress.
@@ -624,11 +625,12 @@ smt(sum_four).
 (*proof for m13 inp call*)
 seq 1 : (x0 = mx /\
   y0 = my /\
-  open mx = x_ /\
-  open my = y_ /\ open m23 = mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1] /\ 
+  x_ = open mx /\
+  y_ = open my /\ open m23 = mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1] /\ 
   open m13 = mx.[0, 2] * my.[2, 0] + mx.[2, 0] * my.[0, 2]).
 inline F4.inp.
 wp;sp.
+
 
 seq 2: ( x1 = x0.[0, 2] * y0.[2, 0] + x0.[2, 0] * y0.[0, 2] /\
   i = 1 /\
@@ -637,13 +639,15 @@ seq 2: ( x1 = x0.[0, 2] * y0.[2, 0] + x0.[2, 0] * y0.[0, 2] /\
   h = 2 /\
   x0 = mx /\
   y0 = my /\
-  open mx = x_ /\
-  open my = y_ /\ open m23 = mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1] /\
+  x_ = open mx /\
+  y_ = open my  /\ open m23 = mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1] /\
   xh = x1 - r).
 auto => />.
 progress.
+
 inline F4.jmp.
 sp;wp.
+
 auto => />.
 progress.
 rewrite /open get_offunm.
@@ -678,8 +682,8 @@ smt(sum_four).
 (*proof for m12 inp call*)
 seq 1 : (x0 = mx /\
   y0 = my /\
-  open mx = x_ /\
-  open my = y_ /\
+  x_ = open mx /\
+  y_ = open my /\
   open m23 = mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1] /\
   open m13 = mx.[0, 2] * my.[2, 0] + mx.[2, 0] * my.[0, 2] /\ 
   open m12 = mx.[0, 3] * my.[3, 0] + mx.[3, 0] * my.[0, 3]).
@@ -693,8 +697,8 @@ seq 2:  ( x1 = x0.[0, 3] * y0.[3, 0] + x0.[3, 0] * y0.[0, 3] /\
   h = 3 /\
   x0 = mx /\
   y0 = my /\
-  open mx = x_ /\
-  open my = y_ /\
+  x_ = open mx /\
+  y_ = open my /\
   open m23 = mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1] /\
   open m13 = mx.[0, 2] * my.[2, 0] + mx.[2, 0] * my.[0, 2] /\
   xh = x1 - r).
@@ -736,8 +740,8 @@ smt(sum_four).
 (*proof for m03 inp call*)
 seq 1 : (x0 = mx /\
   y0 = my /\
-  open mx = x_ /\
-  open my = y_ /\
+  x_ = open mx /\
+  y_ = open my /\
   open m23 = mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1] /\
   open m13 = mx.[0, 2] * my.[2, 0] + mx.[2, 0] * my.[0, 2] /\ 
   open m12 = mx.[0, 3] * my.[3, 0] + mx.[3, 0] * my.[0, 3] /\
@@ -752,8 +756,8 @@ seq 2:  ( x1 = x0.[1, 2] * y0.[2, 1] + x0.[2, 1] * y0.[1, 2] /\
   h = 2 /\
   x0 = mx /\
   y0 = my /\
-  open mx = x_ /\
-  open my = y_ /\
+  x_ = open mx /\
+  y_ = open my /\
   open m23 = mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1] /\
   open m13 = mx.[0, 2] * my.[2, 0] + mx.[2, 0] * my.[0, 2] /\
   open m12 = mx.[0, 3] * my.[3, 0] + mx.[3, 0] * my.[0, 3] /\
@@ -813,8 +817,8 @@ seq 2:  ( x1 = x0.[1, 3] * y0.[3, 1] + x0.[3, 1] * y0.[1, 3] /\
   h = 3 /\
   x0 = mx /\
   y0 = my /\
-  open mx = x_ /\
-  open my = y_ /\
+  x_ = open mx /\
+  y_ = open my /\
   open m23 = mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1] /\
   open m13 = mx.[0, 2] * my.[2, 0] + mx.[2, 0] * my.[0, 2] /\
   open m12 = mx.[0, 3] * my.[3, 0] + mx.[3, 0] * my.[0, 3] /\
@@ -824,6 +828,7 @@ auto => />.
 progress.
 inline F4.jmp.
 sp;wp.
+
 auto => />.
 progress.
 rewrite /open get_offunm.
@@ -858,8 +863,8 @@ smt(sum_four).
 (*proof for m01 inp call*)
 seq 1 : (x0 = mx /\
   y0 = my /\
-  open mx = x_ /\
-  open my = y_ /\
+  x_ = open mx /\
+  y_ = open my /\
   open m23 = mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1] /\
   open m13 = mx.[0, 2] * my.[2, 0] + mx.[2, 0] * my.[0, 2] /\
   open m12 = mx.[0, 3] * my.[3, 0] + mx.[3, 0] * my.[0, 3] /\
@@ -876,8 +881,8 @@ seq 2:  (  x1 = x0.[2, 3] * y0.[3, 2] + x0.[3, 2] * y0.[2, 3] /\
   h = 3 /\
   x0 = mx /\
   y0 = my /\
-  open mx = x_ /\
-  open my = y_ /\
+  x_ = open mx /\
+  y_ = open my /\
   open m23 = mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1] /\
   open m13 = mx.[0, 2] * my.[2, 0] + mx.[2, 0] * my.[0, 2] /\
   open m12 = mx.[0, 3] * my.[3, 0] + mx.[3, 0] * my.[0, 3] /\

@@ -111,13 +111,26 @@ module T = {
   }
 }.
 
-lemma diagonal_equal_zero_check(mat: matrix, n_ : int):
-  hoare[T.f: n = n_ /\ 0 <= n_ ==> forall a, mrange mat n_ n_ =>  T.m.[a, a] = 0].
+
+lemma diagonal_equal_zero_check(n_ : int):
+  hoare[T.f: n = n_ /\ 0 <= n_ ==> forall a, mrange T.m n_ n_ =>  T.m.[a, a] = 0].
 proof.
 proc.
 auto => />.
 progress.
 smt(get_offunm).
+qed.
+
+lemma valid_sharing(n_ : int) :
+  hoare [T.f : n = n_ /\  0 < n ==> forall i j, mrange T.m i j /\ i <> j =>  T.m.[i, j] = j].
+proof.
+proc.
+auto => />.
+progress. 
+rewrite (get_offunm).
+smt (get_offunm) .
+rewrite /f_share. 
+smt ().
 qed.
 
 

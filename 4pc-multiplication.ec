@@ -229,41 +229,6 @@ module F4 = {
 }.
 
 
-op f_share (p s : int) : int =
-  if p = s then 0 else s.
-
-module T = {
-  var m: matrix
-  proc f(n : int):unit = {
-    m <- offunm (f_share, n, n);
-  }
-}.
-
-lemma diagonal_equal_zero_check(n_ : int):
-  hoare[T.f: n = n_ /\ 0 <= n_ ==> forall a, mrange T.m n_ n_ =>  T.m.[a, a] = 0].
-proof.
-proc.
-auto => />.
-progress.
-smt(get_offunm).
-qed.
-
-(*
-lemma valid_sharing(n_ : int) :
-  hoare [T.f : n = n_ /\  0 < n ==> forall i j, mrange T.m i j /\ i <> j =>  T.m.[i, j] = j].
-proof.
-proc.
-auto => />.
-progress. 
-rewrite (get_offunm).
-smt (get_offunm) .
-rewrite /f_share. 
-smt ().
-qed.
-*)
-
-
-
 (* sum of four element list is the sum of the individual elements *)
 lemma sum_four(s : int list) :
     size s = 4 => sumz s = 
@@ -527,16 +492,17 @@ lemma oflist_cat (a b c : int list) :
 proof.
 admit.
 qed.
-
 *)
 
+
+(* Prove the union of two sets and difference of one of the sets results in the other set*)
 lemma fsetUD (A B: party fset) : A `|` B `\` B = A.
 proof.
 apply/fsetP => x.
 by rewrite fsetDv fsetUC fset0U.
 qed.
 
-
+(*Prove that picking the head from a single size set returns the single value*)
 lemma pick1(x: int): pick( Top.FSet.oflist [x]) = x.
 proof. 
 admit.
@@ -545,9 +511,13 @@ qed.
 
 (* Prove correctness of the jmp. *)
 lemma jmp_correct(x_ si_ sj_ d_ g_: party) :
-    hoare[F4.jmp : x = x_ /\ si = si_ /\ sj = sj_ /\ d = d_ /\ g = g_ /\ 0<=g_ /\ g<=3 ==> open res = x_ /\ forall a, mrange F4.m N N =>  F4.m.[a, a] = 0].
+    hoare[F4.jmp : x = x_ /\ si = si_ /\ 
+      sj = sj_ /\ d = d_ /\ g = g_ /\ 
+    0<=g_ /\ g<=3 ==> open res = x_ /\ 
+    forall a, mrange F4.m N N =>  F4.m.[a, a] = 0].
 proof.
 proc.
+(*Proof for open*)
 auto => />.
 progress.
 rewrite _4p.
@@ -564,7 +534,8 @@ simplify.
 rewrite fsetUD.
 rewrite pick1.
 smt(sum_four).
-smt(diagonal_equal_zero_check).
+(*Proof for diagonal elements to be zero.*)
+smt(get_offunm).
 qed.
 
 

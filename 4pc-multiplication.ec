@@ -91,7 +91,7 @@ module Sim = {
 }.
 
 module F4 = {
- var mjmp: matrix
+ var mjmp, minp: matrix
   (* p has a value x and wants to share it with all other parties *)
   proc share(x : int, p : party) : matrix = {
     var s0, s1, s2, s_, s3 : int;
@@ -140,23 +140,24 @@ module F4 = {
     mjmp <- offunm ((fun p s =>
         if p = s then 0 else
         if g = s then x else 0), N, N);
-    return m;
+    return mjmp;
 
   }
 
   (* parties i and j know x, and want to share it with the two other
      parties.
    *)
-  proc inp(x : int, i j : party) : matrix = {
+  proc inp(x : int, i j : party, g h : party) : matrix = {
     var r, xh : int;
-    var g, h : party;
     var pgm : matrix;
 
+(*
     (* figure out excluded parties g, h *)
     var p : party fset;
     p <- (rangeset 0 N) `\` Top.FSet.oflist [i; j];
     g <- nth err (elems p) 0;
     h <- nth err (elems p) 1;
+*)
 
     (* in the paper this is a PRF, but for now model as truly random
        and just don't give it to party g. *)
@@ -168,10 +169,13 @@ module F4 = {
     pgm <@ jmp(xh, i, j, g, h);
 
     (* xi = xj = 0, xg = r, xh = x - r *)
-    return pgm + offunm ((fun p s => 
+    minp <- pgm + offunm ((fun p s => 
       if s = p then 0 else
-      if s = g then r else 0), N, N);
+      if s = h then r else 0), N, N);
+    return minp;
   }
+
+(*
 
   proc mult(x y : matrix) : matrix = {
     var m23, m13, m12, m03, m02, m01, mlocal : matrix;
@@ -210,6 +214,7 @@ module F4 = {
 
     return mz;
   }
+*)
 
   proc add_main(x y : int) : int = {
     var mx, my, mz : matrix;
@@ -280,6 +285,7 @@ qed.
 lemma share_correct(x_ : int, p_ : party) :
     hoare[F4.share: x = x_ /\ p = p_ /\ 0 <= p_ < N ==> open res = x_].
 proof.
+
 proc.
 seq 6 : (x = x_ /\ p = p_ /\ 0 <= p_ < N
   /\ size shares = N
@@ -455,7 +461,7 @@ progress.
 have // : i = 2 /\ j = 3 by smt().
 qed.
 
-lemma offunm_unwrap (i, j : int, f : int -> int -> int):
+lemma offunm_unwrap (i, j : party, f : party -> party -> int):
     0 <= i < N /\ 0 <= j < N => (offunm (fun(x y) => f x y, N, N)).[i, j] = f i j.
 proof.
 progress.
@@ -531,12 +537,76 @@ rewrite rows_offunm cols_offunm => /=; smt(_4p).
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
 simplify.
+
 rewrite fsetUD.
 rewrite pick1.
 smt(sum_four).
 (*Proof for diagonal elements to be zero.*)
 smt(get_offunm).
 qed.
+
+(* Prove correctness of the inp. - NOT COMPLETE.. DIAGONAL ZERO CONDITION *)
+lemma inp_correct(x_ i_ j_ g_ h_: party) :
+    hoare[F4.inp : x = x_ /\ i = i_ /\ 
+      j = j_ /\ h = h_ /\ g = g_ /\ 
+    0<=h_ /\ h<=3 ==> open res = x_ ].
+proof.
+proc.
+(*Proof for open*)
+auto.
+seq 2:  (x = x_ /\ i = i_ /\ 
+      j = j_ /\ h = h_ /\ g = g_ /\ 
+    0<=h_ /\ h<=3 /\ xh = x - r).
+auto => />.
+progress.
+inline F4.jmp.
+sp;wp.
+auto => />.
+progress.
+rewrite /open.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+simplify.
+rewrite fsetUD.
+rewrite pick1.
+rewrite _4p.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+simplify.
+smt(sum_four).
+(*Proof for diagonal elements to be zero.*)
+(*
+move: H3 H4.
+rewrite _4p.
+rewrite get_offunm.
+simplify.
+rewrite /max.
+simplify.
+
+smt().
+*)
+qed.
+
 
 
 

@@ -1,7 +1,7 @@
-
 prover quorum=2 ["Alt-Ergo" "Z3"].
 timeout 1.  (* limit SMT solvers to two seconds *)
 require import AllCore Distr List FSet.
+
 
 require (*---*) DynMatrix.
 
@@ -24,11 +24,31 @@ ZR.mulrC by exact mulrC,
 ZR.mul1r by exact mul1r,
 ZR.mulrDl by exact mulrDl.
 
-type party = int.
+
+type party : int.
+axiom is_valid_party(p: party): 0 <= p <= 3.
 
 import Mat_A.Matrices.
+import Mat_A.Vectors.
 
 op randint : int distr.
+axiom randint_ll : is_lossless randint.
+
+(* bitwidth of int *)
+op L : int.
+axiom ge0_L : 0 <= L.
+
+axiom randint1E (x : int) :
+  mu1 randint x = 1%r / (2 ^ L)%r.
+
+
+(* from SMC example in class *)
+lemma rantint_full : is_full randint.
+proof.
+move => x.
+rewrite /support randint1E.
+by rewrite RField.div1r StdOrder.RealOrder.invr_gt0 lt_fromint StdOrder.IntOrder.expr_gt0.
+qed.
 
 (* WARNING: matrices are zero indexed, so we need to have share 0, party 0 *)
 
@@ -38,6 +58,7 @@ op randint : int distr.
 op N : int.
 axiom _4p : N = 4.
 
+(* An unspecified non-zero error value *)
 op err : int.
 axiom _enz : err <> 0.
 
@@ -46,16 +67,35 @@ op open(m : matrix) =
     (* add up party 0 shares, then add P1's x0... make this nicer? *)
     m.[0, 1] + m.[0, 2] + m.[0, 3] + m.[1, 0].
 
-(* Function to sum all elements of a matrix *)
-op sum_matrix (m : matrix) =
-   m.[0, 1] + m.[0, 2] + m.[0, 3] + m.[1, 0] + m.[1, 2] + m.[1, 3] + m.[2, 0] + m.[2, 1] + m.[2, 3] + m.[3, 0] + m.[3, 1] + m.[3, 2].
-   
-
 (* note: maybe use fset instead of list for party determination? *)
+
+op view(m : matrix, p : party) =
+  row m p.
+
+module Sim = {
+  (* simulator ignores x and p and just returns a random sharing
+     we will argue that all rows of the matrix (parties' views)
+     are indistinguishable. *)
+  proc share(x : int, p : party) : matrix = {
+    var s0, s1, s2, s3 : int;
+    var shares : int list;
+
+    (* generate random *)
+    s0 <$ randint;
+    s1 <$ randint;
+    s2 <$ randint;
+    s3 <$ randint;
+
+    shares <- [s0; s1; s2; s3];
+
+    return offunm ((fun p_ s =>
+        if p_ = s then 0 else (nth err shares s)), N, N);
+  }
+}.
 
 module F4 = {
   (* p has a value x and wants to share it with all other parties *)
-  proc share(x p : int) : matrix = {
+  proc share(x : int, p : party) : matrix = {
     var s0, s1, s2, s_, s3 : int;
 
     var shares : int list;
@@ -76,39 +116,33 @@ module F4 = {
 
     (* TODO: think about if we should use vector here instead of list *)
     (* TODO: basically every `offunm` call is going to have the structure
-        if p = s then 0 else ...
+        if p_ = s then 0 else ...
        maybe we can factor that out?
      *)
-    return offunm ((fun p s =>
-        if p = s then 0 else (nth err shares s)), N, N);
+    return offunm ((fun p_ s =>
+        if p_ = s then 0 else (nth err shares s)), N, N);
   }
 
   (* parties si and sj know x, and want to send it to party d.
      todo: cheating identification (vs just abort)
    *)
-  proc jmp(x : int, si sj : party, d : party) : matrix = {
+  proc jmp(x : int, si sj : party, d : party, g:party) : matrix = {
     (* TODO: party d gets x from si, and H(x) from sj *)
     (* abort if hashes don't check out *)
-    var g : int;
+    (*var g : int;
+
     (* compute the excluded party g *)
-    var p : party fset;
-    p <- oflist [0;1;2;3];
-(*
+    var p : party fset; *)
     (* remove current parties *)
-    g <- pick ((rangeset 0 N) `\` oflist [si; sj; d]);
-*)
-    g <- pick (p `\` oflist [si; sj; d]);
+    var a, b: party fset;
+    a <-  Top.FSet.oflist [si; sj; d];
+    b <-  Top.FSet.oflist [g];
+    g <- pick ( b `|` a `\` a);
 
     return offunm ((fun p s =>
         if p = s then 0 else
         if g = s then x else 0), N, N);
-    
-      (*FOR CHEATING IDENTIFICATION: Model H as a random oracle and have a map to save the value for x.
-      When g checks the value for x if x is in the map then return the same value 
-      otherwise return a new value*)
-
   }
-
 
   (* parties i and j know x, and want to share it with the two other
      parties.
@@ -120,7 +154,7 @@ module F4 = {
 
     (* figure out excluded parties g, h *)
     var p : party fset;
-    p <- (rangeset 0 N) `\` oflist [i; j];
+    p <- (rangeset 0 N) `\` Top.FSet.oflist [i; j];
     g <- nth err (elems p) 0;
     h <- nth err (elems p) 1;
 
@@ -131,7 +165,7 @@ module F4 = {
     xh <- x - r;
 
     (* Pg learns xh *)
-    pgm <@ jmp(xh, i, j, g);
+    pgm <@ jmp(xh, i, j, g, h);
 
     (* xi = xj = 0, xg = r, xh = x - r *)
     return pgm + offunm ((fun p s => 
@@ -139,47 +173,26 @@ module F4 = {
       if s = g then r else 0), N, N);
   }
 
-  (* Hadamard product of mx and my to create mlocal 
-      *)
-
-  proc elem_mult(mx, my: matrix): matrix = {
-    var mz: matrix;
-    var r0, c0, elem: int;
-    r0 <- 0;
-    c0 <- 0;
-    mz <- matrixc N N 0;
-    while (r0 < rows mz) {
-      while (c0 < cols mz) {
-        elem <- mx.[r0, c0]*my.[r0, c0];
-        mz <- updm mz r0 c0 elem;
-        c0 <- c0 + 1;
-      }
-      r0 <- r0 + 1;
-    }
-    return mz;
-  }
-
-
-  proc mult(mx my : matrix) : matrix = {
+  proc mult(x y : matrix) : matrix = {
     var m23, m13, m12, m03, m02, m01, mlocal : matrix;
-(* perform inp on pairs of shares held by both parties.
+
+    (* perform inp on pairs of shares held by both parties.
       for example, both parties 2 and 3 hold x0, x1, y0, y1, so they
       can together compute the term x0y1 * x1y0.
       
       For symmetry we alternate which party we take the share from, but
       the validity check ensures this doesn't actually change the output.
      *)
-    m23 <@ inp(mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1], 2, 3);
-    m13 <@ inp(mx.[0, 2] * my.[2, 0] + mx.[2, 0] * my.[0, 2], 1, 3);
-    m12 <@ inp(mx.[0, 3] * my.[3, 0] + mx.[3, 0] * my.[0, 3], 1, 2);
-    m03 <@ inp(mx.[1, 2] * my.[2, 1] + mx.[2, 1] * my.[1, 2], 0, 3);
-    m02 <@ inp(mx.[1, 3] * my.[3, 1] + mx.[3, 1] * my.[1, 3], 0, 2);
-    m01 <@ inp(mx.[2, 3] * my.[3, 2] + mx.[3, 2] * my.[2, 3], 0, 1);
+    m23 <@ inp(x.[0, 1] * y.[1, 0] + x.[1, 0] * y.[0, 1], 2, 3);
+    m13 <@ inp(x.[0, 2] * y.[2, 0] + x.[2, 0] * y.[0, 2], 1, 3);
+    m12 <@ inp(x.[0, 3] * y.[3, 0] + x.[3, 0] * y.[0, 3], 1, 2);
+    m03 <@ inp(x.[1, 2] * y.[2, 1] + x.[2, 1] * y.[1, 2], 0, 3);
+    m02 <@ inp(x.[1, 3] * y.[3, 1] + x.[3, 1] * y.[1, 3], 0, 2);
+    m01 <@ inp(x.[2, 3] * y.[3, 2] + x.[3, 2] * y.[2, 3], 0, 1);
 
     (* elementwise multiplication to create sharing of x_i * y_i
        this implements inp_local: no communication occurs *)
-    
-    mlocal <@ elem_mult(mx, my);
+    mlocal <- x * y;
 
     (* elementwise addition *)
     return m01 + m02 + m03 + m12 + m13 + m23 + mlocal;   
@@ -264,15 +277,13 @@ smt().
 qed.
 
 (* Prove correctness of the sharing scheme. *)
-lemma share_correct(x_ p_ : int) :
-    hoare[F4.share : x = x_ /\ p = p_ /\ 0 <= p < N ==> open res = x_].
+lemma share_correct(x_ : int, p_ : party) :
+    hoare[F4.share: x = x_ /\ p = p_ /\ 0 <= p_ < N ==> open res = x_].
 proof.
-
 proc.
-seq 6 : (x = x_
-  /\ 0 <= p < N
+seq 6 : (x = x_ /\ p = p_ /\ 0 <= p_ < N
   /\ size shares = N
-  /\ nth err shares p = 0).
+  /\ nth err shares p_ = 0).
 auto; progress.
 rewrite size_put; smt(_4p).
 rewrite nth_put; smt(_4p).
@@ -302,16 +313,86 @@ rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
-
-
 simplify.
-
 (* sum is correct *)
 rewrite _4p in H.
 rewrite (sum_four shares{hr}) // /#.
 qed.
 
 (* Prove the sharing scheme is secure. *)
+lemma share_secure(p_ : party) :
+    equiv[F4.share ~ Sim.share :
+      ={p} /\ p{1} = p_ /\ 0 <= p_ < N
+      ==>
+      view res{1} p_ = view res{2} p_].
+proof.
+proc.
+(* si are all random *)
+seq 5 5 : (={p} /\ p{1} = p_ /\
+  s0{1} \in randint /\ ={s0} /\
+  s1{1} \in randint /\ ={s1} /\
+  s2{1} \in randint /\ ={s2} /\
+  s3{1} \in randint /\ ={s3} /\
+  0 <= p_ < N /\
+  size shares{2} = 4 /\ ={shares}
+).
+auto.
+progress.
+auto.
+progress.
+rewrite _4p in H4.
+(* rewrite matrices *)
+rewrite put_in.
+by rewrite size_put H5.
+(* convert view of matrix to vector *)
+rewrite /view /row.
+rewrite 2!cols_offunm _4p lez_maxr //.
+rewrite eq_vectorP.
+rewrite 2!size_offunv lez_maxr // /=.
+move => i i_bounded.
+rewrite get_offunv // get_offunv //.
+(* evaluate function calls *)
+simplify.
+(* convert back to matrix *)
+rewrite get_offunm.
+rewrite rows_offunm lez_maxr // cols_offunm lez_maxr //.
+rewrite get_offunm.
+rewrite rows_offunm lez_maxr // cols_offunm lez_maxr //.
+progress.
+(* trivial when p = i => diagonal, so zero *)
+case (p{2} = i) => [// | off_diag].
+(* off diagonal: shares are indistinguishable *)
+rewrite nth_cat.
+rewrite size_take //.
+rewrite size_put.
+rewrite H5 H4 /=.
+(* one side of diagonal *)
+case (p{2} < i) => [plti | pgteqi].
+have inltp : !(i < p{2}).
+  smt().
+rewrite inltp /=.
+rewrite nth_drop.
+smt().
+smt().
+have ip2n0 : i - p{2} <> 0.
+  smt().
+rewrite ip2n0 /=.
+rewrite nth_put.
+by rewrite H5 H3 H4.
+have simp_mat_add : i = p{2} + 1 + (i - p{2} - 1)%Mat_A.ZR.
+  smt(addrA addrC).
+by rewrite -simp_mat_add off_diag /=.
+(* other side of diagonal *)
+have iltp : i < p{2}.
+  smt().
+rewrite iltp /=.
+rewrite nth_take.
+rewrite H3.
+rewrite iltp.
+rewrite nth_put.
+rewrite H3 H5 H4 //.
+rewrite off_diag //.
+qed.
 
 (* need lemma valid shares *)
 
@@ -374,47 +455,30 @@ progress.
 have // : i = 2 /\ j = 3 by smt().
 qed.
 
-lemma pick_nonmem (s : party fset) :
-    forall k, k \in s => pick (rangeset 0 N `\` s) <> k.
+
+lemma fsetUD (A B: party fset) : A `|` B `\` B = A.
 proof.
+apply/fsetP => x.
+by rewrite fsetDv fsetUC fset0U.
+qed.
+
+
+lemma pick1(x: int): pick( Top.FSet.oflist [x]) = x.
+proof. 
+rewrite pickE.
 admit.
 qed.
-(*progress.
-rewrite /pick.
-rewrite /(`\`).
-rewrite /rangeset.
-have : uniq (range 0 n).
-  by rewrite range_uniq.
-progress.
-rewrite oflist_uniq in H0.*)
-
-lemma offunm_unwrap (i, j : int, f : int -> int -> int):
-    0 <= i < N /\ 0 <= j < N => (offunm (fun(x y) => f x y, N, N)).[i, j] = f i j.
-proof.
-progress.
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm H H1 /=.
-move : H0 H2.
-by rewrite _4p.
-by simplify.
-qed.
-
-
-lemma nth_set (i : int, s : int list) :
-  uniq s => nth err (elems (oflist s)) i = nth err s i.
-proof.
-admit.
-qed.
-
-
 
 (* Prove correctness of the jmp scheme. *)
-lemma jmp_correct(x_ : int) :
-    hoare[F4.jmp : x = x_ /\ si = 0 /\ sj = 1 /\ d = 2 ==> open res = x_].
+lemma jmp_correct(x_ si_ sj_ d_ g_: party) :
+    hoare[F4.jmp : x = x_ /\ si = si_ /\ sj = sj_ /\ d = d_ /\ g = g_  ==> open res = x_].
 proof.
 proc.
+
 auto => />.
+progress.
 rewrite _4p.
+
 
 rewrite /open.
 rewrite get_offunm.
@@ -427,7 +491,12 @@ rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
 simplify.
 
+rewrite fsetUD.
+rewrite pick1.
+apply is_valid_party.
 
+smt(sum_four).
+ // /#.
 (*
 rewrite elemsK.
 rewrite in_fsetD.

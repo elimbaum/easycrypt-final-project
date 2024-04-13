@@ -437,9 +437,9 @@ qed.*)
 (* Prove correctness of the jmp. *)
 lemma jmp_correct(x_ si_ sj_ d_ g_: party) :
     hoare[F4.jmp : x = x_ /\ si = si_ /\ 
-      sj = sj_ /\ d = d_ /\ g = g_ /\ 
-    0<=g_ /\ g<=3 ==> open res = x_ /\ 
-    forall a, mrange res a a => res.[a, a] = 0].
+      sj = sj_ /\ d = d_ /\ g = g_ /\ 0 <= g_ < N
+      ==>
+      open res = x_ /\ forall a, mrange res a a => res.[a, a] = 0].
 proof.
 proc.
 (*Proof for open*)
@@ -456,30 +456,45 @@ rewrite rows_offunm cols_offunm => /=; smt(_4p).
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
 simplify.
-smt(sum_four).
+smt(_4p sum_four).
 (*Proof for diagonal elements to be zero.*)
 smt(get_offunm).
 qed.
 
 (* Prove correctness of the inp.*)
 lemma inp_correct(x_ i_ j_ g_ h_: party) :
-    hoare[F4.inp : x = x_ /\ i = i_ /\ 
-      j = j_ /\ h = h_ /\ g = g_ /\ 
-    0<=h_ /\ h<=3 ==> open res = x_  /\ 
-    forall a, mrange res a a /\ a < N => res.[a, a] = 0].
+    hoare[F4.inp : x = x_ /\ i = i_ /\
+      j = j_ /\ h = h_ /\ g = g_ /\ 0 <= h_ < N
+      ==>
+      open res = x_  /\ forall a, mrange res a a /\ a < N => res.[a, a] = 0].
 proof.
 proc.
 (*Proof for open*)
 auto.
-seq 2:  (x = x_ /\ i = i_ /\ 
-      j = j_ /\ h = h_ /\ g = g_ /\ 
-    0<=h_ /\ h<=3 /\ xh = x - r) .
-auto => />.
+seq 2 : (x = x_ /\ i = i_ /\ j = j_ /\ h = h_ /\ g = g_ /\ 
+  0 <= h_ < N /\ xh = x - r).
+auto.
+progress.
+call (_ : true).
+auto.
+auto.
+progress.
+rewrite /open.
+rewrite /get_offunm.
+
+inline.
+auto.
+progress.
+call (jmp_correct xh i_ j_ g_ h_).
+auto.
 progress.
 (*CAN BE SHORTENED BY MAKING THE FOLLOWING CALL WORK*)
-(*
-call (jmp_correct xh i_ j_ g_ h_).
-*)
+
+call (jmp_correct x_ i_ j_ g_ h_).
+
+progress.
+
+
 inline F4.jmp.
 sp;wp.
 auto => />.

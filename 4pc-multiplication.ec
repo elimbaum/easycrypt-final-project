@@ -91,7 +91,7 @@ module Sim = {
 }.
 
 module F4 = {
- var m: matrix
+ var mjmp: matrix
   (* p has a value x and wants to share it with all other parties *)
   proc share(x : int, p : party) : matrix = {
     var s0, s1, s2, s_, s3 : int;
@@ -137,7 +137,7 @@ module F4 = {
     a <-  Top.FSet.oflist [si; sj; d];
     b <-  Top.FSet.oflist [g];
     g <- pick ( b `|` a `\` a);
-    m <- offunm ((fun p s =>
+    mjmp <- offunm ((fun p s =>
         if p = s then 0 else
         if g = s then x else 0), N, N);
     return m;
@@ -514,7 +514,7 @@ lemma jmp_correct(x_ si_ sj_ d_ g_: party) :
     hoare[F4.jmp : x = x_ /\ si = si_ /\ 
       sj = sj_ /\ d = d_ /\ g = g_ /\ 
     0<=g_ /\ g<=3 ==> open res = x_ /\ 
-    forall a, mrange F4.m N N =>  F4.m.[a, a] = 0].
+    forall a, mrange F4.mjmp N N =>  F4.mjmp.[a, a] = 0].
 proof.
 proc.
 (*Proof for open*)

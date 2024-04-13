@@ -545,24 +545,20 @@ smt(sum_four).
 smt(get_offunm).
 qed.
 
-(* Prove correctness of the inp. - NOT COMPLETE.. DIAGONAL ZERO CONDITION *)
+(* Prove correctness of the inp.*)
 lemma inp_correct(x_ i_ j_ g_ h_: party) :
     hoare[F4.inp : x = x_ /\ i = i_ /\ 
       j = j_ /\ h = h_ /\ g = g_ /\ 
     0<=h_ /\ h<=3 ==> open res = x_  /\ 
-    forall a, mrange F4.minp a a =>  F4.minp.[a, a] = 0].
+    forall a, mrange F4.minp a a /\ a < N =>  F4.minp.[a, a] = 0].
 proof.
 proc.
 (*Proof for open*)
-
 auto.
-
 seq 2:  (x = x_ /\ i = i_ /\ 
       j = j_ /\ h = h_ /\ g = g_ /\ 
-    0<=h_ /\ h<=3 /\ xh = x - r  /\ 
-    forall a, mrange F4.minp a a =>  F4.minp.[a, a] = 0) .
+    0<=h_ /\ h<=3 /\ xh = x - r) .
 auto => />.
-rewrite _4p.
 progress.
 inline F4.jmp.
 sp;wp.
@@ -600,16 +596,19 @@ rewrite rows_offunm cols_offunm => /=; smt(_4p).
 simplify.
 smt(sum_four).
 (*Proof for diagonal elements to be zero.*)
-(*
-move: H3 H4.
+move: H2 H3.
 rewrite _4p.
 rewrite get_offunm.
 simplify.
 rewrite /max.
 simplify.
-
-smt().
-*)
+smt(_4p).
+auto => />.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+simplify => //.
 qed.
 
 

@@ -91,6 +91,7 @@ module Sim = {
 }.
 
 module F4 = {
+ var m: matrix
   (* p has a value x and wants to share it with all other parties *)
   proc share(x : int, p : party) : matrix = {
     var s0, s1, s2, s_, s3 : int;
@@ -132,13 +133,14 @@ module F4 = {
     var p : party fset; *)
     (* remove current parties *)
     var a, b: party fset;
-    var m: matrix;
+   
     a <-  Top.FSet.oflist [si; sj; d];
     b <-  Top.FSet.oflist [g];
     g <- pick ( b `|` a `\` a);
-    return offunm ((fun p s =>
+    m <- offunm ((fun p s =>
         if p = s then 0 else
         if g = s then x else 0), N, N);
+    return m;
 
   }
 
@@ -225,6 +227,41 @@ module F4 = {
     return z;
   }
 }.
+
+
+op f_share (p s : int) : int =
+  if p = s then 0 else s.
+
+module T = {
+  var m: matrix
+  proc f(n : int):unit = {
+    m <- offunm (f_share, n, n);
+  }
+}.
+
+lemma diagonal_equal_zero_check(n_ : int):
+  hoare[T.f: n = n_ /\ 0 <= n_ ==> forall a, mrange T.m n_ n_ =>  T.m.[a, a] = 0].
+proof.
+proc.
+auto => />.
+progress.
+smt(get_offunm).
+qed.
+
+(*
+lemma valid_sharing(n_ : int) :
+  hoare [T.f : n = n_ /\  0 < n ==> forall i j, mrange T.m i j /\ i <> j =>  T.m.[i, j] = j].
+proof.
+proc.
+auto => />.
+progress. 
+rewrite (get_offunm).
+smt (get_offunm) .
+rewrite /f_share. 
+smt ().
+qed.
+*)
+
 
 
 (* sum of four element list is the sum of the individual elements *)
@@ -508,7 +545,7 @@ qed.
 
 (* Prove correctness of the jmp. *)
 lemma jmp_correct(x_ si_ sj_ d_ g_: party) :
-    hoare[F4.jmp : x = x_ /\ si = si_ /\ sj = sj_ /\ d = d_ /\ g = g_ /\ 0<=g_ /\ g<=3 ==> open res = x_].
+    hoare[F4.jmp : x = x_ /\ si = si_ /\ sj = sj_ /\ d = d_ /\ g = g_ /\ 0<=g_ /\ g<=3 ==> open res = x_ /\ forall a, mrange F4.m N N =>  F4.m.[a, a] = 0].
 proof.
 proc.
 auto => />.
@@ -527,6 +564,7 @@ simplify.
 rewrite fsetUD.
 rewrite pick1.
 smt(sum_four).
+smt(diagonal_equal_zero_check).
 qed.
 
 

@@ -123,19 +123,23 @@ module F4 = {
   (* parties si and sj know x, and want to send it to party d.
      todo: cheating identification (vs just abort)
    *)
-  proc jmp(x : int, si sj : party, d : party) : matrix = {
+  proc jmp(x : int, si sj : party, d : party, g:party) : matrix = {
     (* TODO: party d gets x from si, and H(x) from sj *)
     (* abort if hashes don't check out *)
-    var g : int;
+    (*var g : int;
 
     (* compute the excluded party g *)
-    var p : party fset;
+    var p : party fset; *)
     (* remove current parties *)
-    g <- pick ((rangeset 0 N) `\` Top.FSet.oflist [si; sj; d]);
-
+    var a, b: party fset;
+    var m: matrix;
+    a <-  Top.FSet.oflist [si; sj; d];
+    b <-  Top.FSet.oflist [g];
+    g <- pick ( b `|` a `\` a);
     return offunm ((fun p s =>
         if p = s then 0 else
-        if g = s then x else 0), N, N);
+        if g = s && 0<=g && g<=3 then x else 0), N, N);
+
   }
 
   (* parties i and j know x, and want to share it with the two other
@@ -159,7 +163,7 @@ module F4 = {
     xh <- x - r;
 
     (* Pg learns xh *)
-    pgm <@ jmp(xh, i, j, g);
+    pgm <@ jmp(xh, i, j, g, h);
 
     (* xi = xj = 0, xg = r, xh = x - r *)
     return pgm + offunm ((fun p s => 
@@ -449,6 +453,17 @@ progress.
 have // : i = 2 /\ j = 3 by smt().
 qed.
 
+lemma offunm_unwrap (i, j : int, f : int -> int -> int):
+    0 <= i < N /\ 0 <= j < N => (offunm (fun(x y) => f x y, N, N)).[i, j] = f i j.
+proof.
+progress.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm H H1 /=.
+move : H0 H2.
+by rewrite _4p.
+by simplify.
+qed.
+
 (* lemma pick_nonmem (s : party fset) :
     forall k, k \in s => pick (rangeset 0 N `\` s) <> k.
 proof.
@@ -461,20 +476,9 @@ rewrite /rangeset.
 have : uniq (range 0 n).
   by rewrite range_uniq.
 progress.
-rewrite oflist_uniq in H0.*)
+rewrite oflist_uniq in H0.
 
-lemma offunm_unwrap (i, j : int, f : int -> int -> int):
-    0 <= i < N /\ 0 <= j < N => (offunm (fun(x y) => f x y, N, N)).[i, j] = f i j.
-proof.
-progress.
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm H H1 /=.
-move : H0 H2.
-by rewrite _4p.
-by simplify.
-qed.
 
-(*
 lemma nth_set (i : int, s : int list) :
   uniq s => nth err (elems (oflist s)) i = nth err s i.
 proof.
@@ -485,7 +489,52 @@ lemma oflist_cat (a b c : int list) :
     a ++ b = c => oflist c `\` oflist b = oflist a.
 proof.
 admit.
-qed.*)
+qed.
+
+*)
+
+lemma fsetUD (A B: party fset) : A `|` B `\` B = A.
+proof.
+apply/fsetP => x.
+by rewrite fsetDv fsetUC fset0U.
+qed.
+
+
+lemma pick1(x: int): pick( Top.FSet.oflist [x]) = x.
+proof. 
+admit.
+qed.
+
+
+(* Prove correctness of the jmp. *)
+lemma jmp_correct(x_ si_ sj_ d_ g_: party) :
+    hoare[F4.jmp : x = x_ /\ si = si_ /\ sj = sj_ /\ d = d_ /\ g = g_ /\ 0<=g_ /\ g<=3 ==> open res = x_].
+proof.
+proc.
+auto => />.
+progress.
+rewrite _4p.
+rewrite /open.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+simplify.
+rewrite fsetUD.
+rewrite pick1.
+smt(sum_four).
+qed.
+
+
+
+
+
+
+
 
 (* Prove multiplication is correct *)
 lemma mul_correct(x_ y_ : int) :

@@ -25,8 +25,7 @@ ZR.mul1r by exact mul1r,
 ZR.mulrDl by exact mulrDl.
 
 
-type party : int.
-axiom is_valid_party(p: party): 0 <= p <= 3.
+type party = int.
 
 import Mat_A.Matrices.
 import Mat_A.Vectors.
@@ -135,13 +134,14 @@ module F4 = {
     var p : party fset; *)
     (* remove current parties *)
     var a, b: party fset;
+    var m: matrix;
     a <-  Top.FSet.oflist [si; sj; d];
     b <-  Top.FSet.oflist [g];
     g <- pick ( b `|` a `\` a);
-
     return offunm ((fun p s =>
         if p = s then 0 else
-        if g = s then x else 0), N, N);
+        if g = s && 0<=g && g<=3 then x else 0), N, N);
+
   }
 
   (* parties i and j know x, and want to share it with the two other
@@ -469,17 +469,14 @@ rewrite pickE.
 admit.
 qed.
 
-(* Prove correctness of the jmp scheme. *)
+(* Prove correctness of the jmp. *)
 lemma jmp_correct(x_ si_ sj_ d_ g_: party) :
-    hoare[F4.jmp : x = x_ /\ si = si_ /\ sj = sj_ /\ d = d_ /\ g = g_  ==> open res = x_].
+    hoare[F4.jmp : x = x_ /\ si = si_ /\ sj = sj_ /\ d = d_ /\ g = g_ /\ 0<=g_ /\ g<=3 ==> open res = x_].
 proof.
 proc.
-
 auto => />.
 progress.
 rewrite _4p.
-
-
 rewrite /open.
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
@@ -490,34 +487,11 @@ rewrite rows_offunm cols_offunm => /=; smt(_4p).
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
 simplify.
-
 rewrite fsetUD.
 rewrite pick1.
-apply is_valid_party.
-
 smt(sum_four).
- // /#.
-(*
-rewrite elemsK.
-rewrite in_fsetD.
-
-simplify.
-rewrite -in_eq_fset0.
-
-
-rewrite /offunm_unwrap.
-
-
-simplify.
-rewrite /pick.
-rewrite -pick_nonmem.
-*)
-
-
-
-
-
 qed.
+
 
 
 

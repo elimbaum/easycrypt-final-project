@@ -520,7 +520,7 @@ lemma jmp_correct(x_ si_ sj_ d_ g_: party) :
     hoare[F4.jmp : x = x_ /\ si = si_ /\ 
       sj = sj_ /\ d = d_ /\ g = g_ /\ 
     0<=g_ /\ g<=3 ==> open res = x_ /\ 
-    forall a, mrange F4.mjmp N N =>  F4.mjmp.[a, a] = 0].
+    forall a, mrange F4.mjmp a a =>  F4.mjmp.[a, a] = 0].
 proof.
 proc.
 (*Proof for open*)
@@ -549,15 +549,20 @@ qed.
 lemma inp_correct(x_ i_ j_ g_ h_: party) :
     hoare[F4.inp : x = x_ /\ i = i_ /\ 
       j = j_ /\ h = h_ /\ g = g_ /\ 
-    0<=h_ /\ h<=3 ==> open res = x_ ].
+    0<=h_ /\ h<=3 ==> open res = x_  /\ 
+    forall a, mrange F4.minp a a =>  F4.minp.[a, a] = 0].
 proof.
 proc.
 (*Proof for open*)
+
 auto.
+
 seq 2:  (x = x_ /\ i = i_ /\ 
       j = j_ /\ h = h_ /\ g = g_ /\ 
-    0<=h_ /\ h<=3 /\ xh = x - r).
+    0<=h_ /\ h<=3 /\ xh = x - r  /\ 
+    forall a, mrange F4.minp a a =>  F4.minp.[a, a] = 0) .
 auto => />.
+rewrite _4p.
 progress.
 inline F4.jmp.
 sp;wp.

@@ -175,8 +175,6 @@ module F4 = {
     return minp;
   }
 
-(*
-
   proc mult(x y : matrix) : matrix = {
     var m23, m13, m12, m03, m02, m01, mlocal : matrix;
 
@@ -187,16 +185,17 @@ module F4 = {
       For symmetry we alternate which party we take the share from, but
       the validity check ensures this doesn't actually change the output.
      *)
-    m23 <@ inp(x.[0, 1] * y.[1, 0] + x.[1, 0] * y.[0, 1], 2, 3);
-    m13 <@ inp(x.[0, 2] * y.[2, 0] + x.[2, 0] * y.[0, 2], 1, 3);
-    m12 <@ inp(x.[0, 3] * y.[3, 0] + x.[3, 0] * y.[0, 3], 1, 2);
-    m03 <@ inp(x.[1, 2] * y.[2, 1] + x.[2, 1] * y.[1, 2], 0, 3);
-    m02 <@ inp(x.[1, 3] * y.[3, 1] + x.[3, 1] * y.[1, 3], 0, 2);
-    m01 <@ inp(x.[2, 3] * y.[3, 2] + x.[3, 2] * y.[2, 3], 0, 1);
+    m23 <@ inp(x.[0, 1] * y.[1, 0] + x.[1, 0] * y.[0, 1], 2, 3, 0, 1);
+    m13 <@ inp(x.[0, 2] * y.[2, 0] + x.[2, 0] * y.[0, 2], 1, 3, 0, 2);
+    m12 <@ inp(x.[0, 3] * y.[3, 0] + x.[3, 0] * y.[0, 3], 1, 2, 0, 3);
+    m03 <@ inp(x.[1, 2] * y.[2, 1] + x.[2, 1] * y.[1, 2], 0, 3, 1, 2);
+    m02 <@ inp(x.[1, 3] * y.[3, 1] + x.[3, 1] * y.[1, 3], 0, 2, 1, 3);
+    m01 <@ inp(x.[2, 3] * y.[3, 2] + x.[3, 2] * y.[2, 3], 0, 1, 2, 3);
 
     (* elementwise multiplication to create sharing of x_i * y_i
        this implements inp_local: no communication occurs *)
-    mlocal <- x * y;
+    mlocal <- offunm ((fun p s => 
+      if s = p then 0 else x.[p, s] * y.[p, s]), N, N);
 
     (* elementwise addition *)
     return m01 + m02 + m03 + m12 + m13 + m23 + mlocal;   
@@ -214,7 +213,7 @@ module F4 = {
 
     return mz;
   }
-*)
+
 
   proc add_main(x y : int) : int = {
     var mx, my, mz : matrix;
@@ -559,6 +558,10 @@ seq 2:  (x = x_ /\ i = i_ /\
     0<=h_ /\ h<=3 /\ xh = x - r) .
 auto => />.
 progress.
+(*CAN BE SHORTENED BY MAKING THE FOLLOWING CALL WORK*)
+(*
+call (jmp_correct xh i_ j_ g_ h_).
+*)
 inline F4.jmp.
 sp;wp.
 auto => />.
@@ -611,9 +614,14 @@ simplify => //.
 qed.
 
 
-
-
-
+lemma open_add (m1 m2 m3 m4 m5 m6 m7: matrix):
+  open(m1 + m2 + m3 + m4 + m5 + m6 + m7) = open m1 + open m2 + open m3 + open m4 + open m5 + open m6 + open m7.
+proof.
+rewrite /open.
+(*there must be some way to write this elegantly*)
+rewrite {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm  {1}get_addm {1}get_addm {1}get_addm {1}get_addm.
+smt(get_addm addmA).
+qed.
 
 
 
@@ -632,75 +640,387 @@ seq 1 : (open mx = x_ /\ open my = y_).
 auto.
 call (share_correct y_ 1).
 auto; smt().
-wp.
 inline F4.mult.
 wp; sp.
 
-seq 1 : (open m23 = mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1]).
+
+(*proof for m23 inp call*)
+seq 1 : ( x0 = mx /\ y0 = my /\ open mx = x_ /\ open my = y_ /\
+  open m23 = mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1]).
+
 inline F4.inp.
-
-seq 4 : (x1 = mx.[0,1]*my.[1,0] + mx.[1,0]*my.[0,1] /\ i = 2 /\ j = 3 /\ p = oflist [0; 1]).
-auto.
+wp;sp.
+seq 2:  (
+  x1 = x0.[0, 1] * y0.[1, 0] + x0.[1, 0] * y0.[0, 1] /\
+  i = 2 /\
+  j = 3 /\
+  g = 0 /\ h = 1 /\ x0 = mx /\ y0 = my /\ 
+  open mx = x_ /\ open my = y_ /\  
+  xh = x1 - r) .
+auto => />.
 progress.
-rewrite n4.
-rewrite /rangeset.
-rewrite range4.
-by rewrite (oflist_cat [0; 1] [2; 3] [0; 1; 2; 3]).
-
-seq 2 : (x1 = mx.[0,1]*my.[1,0] + mx.[1,0]*my.[0,1] /\ i = 2 /\ j = 3 /\ g = 0 /\ h = 1).
-auto.
-progress.
-by rewrite nth_set.
-by rewrite nth_set.
-
-seq 2 : (xh = x1 - r /\ i = 2 /\ j = 3 /\ g = 0 /\ h = 1); auto.
 inline F4.jmp.
-auto; progress.
-rewrite /open n4 /rangeset range4.
+sp;wp.
+auto => />.
+progress.
+rewrite /open get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
 rewrite get_offunm.
-rewrite rows_offunm cols_offunm => /#.
-simplify.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
 rewrite get_offunm.
-rewrite rows_offunm cols_offunm => /#.
-simplify.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
 rewrite get_offunm.
-rewrite rows_offunm cols_offunm => /#.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
 simplify.
+rewrite fsetUD.
+rewrite pick1.
+rewrite _4p.
 rewrite get_offunm.
-rewrite rows_offunm cols_offunm => /#.
-simplify.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
 rewrite get_offunm.
-rewrite rows_offunm cols_offunm => /#.
-simplify.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
 rewrite get_offunm.
-rewrite rows_offunm cols_offunm => /#.
-simplify.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
 rewrite get_offunm.
-rewrite rows_offunm cols_offunm => /#.
-simplify.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
 rewrite get_offunm.
-rewrite rows_offunm cols_offunm => /#.
-simplify.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
 rewrite get_offunm.
-rewrite rows_offunm cols_offunm => /#.
-simplify.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
 rewrite get_offunm.
-rewrite rows_offunm cols_offunm => /#.
-simplify.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
 rewrite get_offunm.
-rewrite rows_offunm cols_offunm => /#.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
 simplify.
+smt(sum_four).
+
+(*proof for m13 inp call*)
+seq 1 : (x0 = mx /\
+  y0 = my /\
+  open mx = x_ /\
+  open my = y_ /\ open m23 = mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1] /\ 
+  open m13 = mx.[0, 2] * my.[2, 0] + mx.[2, 0] * my.[0, 2]).
+inline F4.inp.
+wp;sp.
+
+seq 2: ( x1 = x0.[0, 2] * y0.[2, 0] + x0.[2, 0] * y0.[0, 2] /\
+  i = 1 /\
+  j = 3 /\
+  g = 0 /\
+  h = 2 /\
+  x0 = mx /\
+  y0 = my /\
+  open mx = x_ /\
+  open my = y_ /\ open m23 = mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1] /\
+  xh = x1 - r).
+auto => />.
+progress.
+inline F4.jmp.
+sp;wp.
+auto => />.
+progress.
+rewrite /open get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
 rewrite get_offunm.
-rewrite rows_offunm cols_offunm => /#.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
 simplify.
+rewrite fsetUD.
+rewrite pick1.
+rewrite _4p.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+simplify.
+smt(sum_four).
+
+(*proof for m12 inp call*)
+seq 1 : (x0 = mx /\
+  y0 = my /\
+  open mx = x_ /\
+  open my = y_ /\
+  open m23 = mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1] /\
+  open m13 = mx.[0, 2] * my.[2, 0] + mx.[2, 0] * my.[0, 2] /\ 
+  open m12 = mx.[0, 3] * my.[3, 0] + mx.[3, 0] * my.[0, 3]).
+inline F4.inp.
+wp;sp.
+
+seq 2:  ( x1 = x0.[0, 3] * y0.[3, 0] + x0.[3, 0] * y0.[0, 3] /\
+  i = 1 /\
+  j = 2 /\
+  g = 0 /\
+  h = 3 /\
+  x0 = mx /\
+  y0 = my /\
+  open mx = x_ /\
+  open my = y_ /\
+  open m23 = mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1] /\
+  open m13 = mx.[0, 2] * my.[2, 0] + mx.[2, 0] * my.[0, 2] /\
+  xh = x1 - r).
+auto => />.
+progress.
+inline F4.jmp.
+sp;wp.
+auto => />.
+progress.
+rewrite /open get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+simplify.
+rewrite fsetUD.
+rewrite pick1.
+rewrite _4p.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+simplify.
+smt(sum_four).
+
+(*proof for m03 inp call*)
+seq 1 : (x0 = mx /\
+  y0 = my /\
+  open mx = x_ /\
+  open my = y_ /\
+  open m23 = mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1] /\
+  open m13 = mx.[0, 2] * my.[2, 0] + mx.[2, 0] * my.[0, 2] /\ 
+  open m12 = mx.[0, 3] * my.[3, 0] + mx.[3, 0] * my.[0, 3] /\
+  open m03 = mx.[1, 2] * my.[2, 1] + mx.[2, 1] * my.[1, 2]).
+inline F4.inp.
+wp;sp.
+
+seq 2:  ( x1 = x0.[1, 2] * y0.[2, 1] + x0.[2, 1] * y0.[1, 2] /\
+  i = 0 /\
+  j = 3 /\
+  g = 1 /\
+  h = 2 /\
+  x0 = mx /\
+  y0 = my /\
+  open mx = x_ /\
+  open my = y_ /\
+  open m23 = mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1] /\
+  open m13 = mx.[0, 2] * my.[2, 0] + mx.[2, 0] * my.[0, 2] /\
+  open m12 = mx.[0, 3] * my.[3, 0] + mx.[3, 0] * my.[0, 3] /\
+  xh = x1 - r).
+auto => />.
+progress.
+inline F4.jmp.
+sp;wp.
+auto => />.
+progress.
+rewrite /open get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+simplify.
+rewrite fsetUD.
+rewrite pick1.
+rewrite _4p.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+simplify.
+smt(sum_four).
+
+(*proof for m02 inp call*)
+seq 1 : (x0 = mx /\
+  y0 = my /\
+  open mx = x_ /\
+  open my = y_ /\
+  open m23 = mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1] /\
+  open m13 = mx.[0, 2] * my.[2, 0] + mx.[2, 0] * my.[0, 2] /\ 
+  open m12 = mx.[0, 3] * my.[3, 0] + mx.[3, 0] * my.[0, 3] /\
+  open m03 = mx.[1, 2] * my.[2, 1] + mx.[2, 1] * my.[1, 2] /\ 
+  open m02 = mx.[1, 3] * my.[3, 1] + mx.[3, 1] * my.[1, 3]).
+inline F4.inp.
+wp;sp.
+
+seq 2:  ( x1 = x0.[1, 3] * y0.[3, 1] + x0.[3, 1] * y0.[1, 3] /\
+  i = 0 /\
+  j = 2 /\
+  g = 1 /\
+  h = 3 /\
+  x0 = mx /\
+  y0 = my /\
+  open mx = x_ /\
+  open my = y_ /\
+  open m23 = mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1] /\
+  open m13 = mx.[0, 2] * my.[2, 0] + mx.[2, 0] * my.[0, 2] /\
+  open m12 = mx.[0, 3] * my.[3, 0] + mx.[3, 0] * my.[0, 3] /\
+  open m03 = mx.[1, 2] * my.[2, 1] + mx.[2, 1] * my.[1, 2] /\
+  xh = x1 - r).
+auto => />.
+progress.
+inline F4.jmp.
+sp;wp.
+auto => />.
+progress.
+rewrite /open get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+simplify.
+rewrite fsetUD.
+rewrite pick1.
+rewrite _4p.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+simplify.
+smt(sum_four).
+
+(*proof for m01 inp call*)
+seq 1 : (x0 = mx /\
+  y0 = my /\
+  open mx = x_ /\
+  open my = y_ /\
+  open m23 = mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1] /\
+  open m13 = mx.[0, 2] * my.[2, 0] + mx.[2, 0] * my.[0, 2] /\
+  open m12 = mx.[0, 3] * my.[3, 0] + mx.[3, 0] * my.[0, 3] /\
+  open m03 = mx.[1, 2] * my.[2, 1] + mx.[2, 1] * my.[1, 2] /\
+  open m02 = mx.[1, 3] * my.[3, 1] + mx.[3, 1] * my.[1, 3] /\ 
+  open m01 = mx.[2, 3] * my.[3, 2] + mx.[3, 2] * my.[2, 3]).
+inline F4.inp.
+wp;sp.
+
+seq 2:  (  x1 = x0.[2, 3] * y0.[3, 2] + x0.[3, 2] * y0.[2, 3] /\
+  i = 0 /\
+  j = 1 /\
+  g = 2 /\
+  h = 3 /\
+  x0 = mx /\
+  y0 = my /\
+  open mx = x_ /\
+  open my = y_ /\
+  open m23 = mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1] /\
+  open m13 = mx.[0, 2] * my.[2, 0] + mx.[2, 0] * my.[0, 2] /\
+  open m12 = mx.[0, 3] * my.[3, 0] + mx.[3, 0] * my.[0, 3] /\
+  open m03 = mx.[1, 2] * my.[2, 1] + mx.[2, 1] * my.[1, 2] /\
+  open m02 = mx.[1, 3] * my.[3, 1] + mx.[3, 1] * my.[1, 3] /\
+  xh = x1 - r).
+auto => />.
+progress.
+inline F4.jmp.
+sp;wp.
+auto => />.
+progress.
+rewrite /open get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+simplify.
+rewrite fsetUD.
+rewrite pick1.
+rewrite _4p.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+simplify.
+smt(sum_four).
 
 
-have no1 : 1 \notin oflist [2; 3; 0].
-rewrite (mem_oflist).
-smt().
 
-rewrite rem23 /=.
-smt().
+auto => />.
+progress.
+rewrite open_add. 
+rewrite H H0 H1 H2 H3 H4.
+
+rewrite /open.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm => /=; smt(_4p).
+
+simplify.
+
 
 qed.
 

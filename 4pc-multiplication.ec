@@ -1,6 +1,6 @@
 prover quorum=2 ["Alt-Ergo" "Z3"].
 timeout 1.  (* limit SMT solvers to two seconds *)
-require import AllCore Distr List FSet.
+require import AllCore Distr List.
 
 
 require (*---*) DynMatrix.
@@ -40,7 +40,7 @@ axiom randint1E (x : int) :
   mu1 randint x = 1%r / (2 ^ L)%r.
 
 (* from SMC example in class *)
-lemma rantint_full : is_full randint.
+lemma randint_full : is_full randint.
 proof.
 move => x.
 rewrite /support randint1E.
@@ -91,7 +91,6 @@ module Sim = {
 }.
 
 module F4 = {
- var mjmp, minp: matrix
   (* p has a value x and wants to share it with all other parties *)
   proc share(x : int, p : party) : matrix = {
     var s0, s1, s2, s_, s3 : int;
@@ -122,42 +121,26 @@ module F4 = {
   }
 
   (* parties si and sj know x, and want to send it to party d.
+     g is exlcuded.
      todo: cheating identification (vs just abort)
    *)
-  proc jmp(x : int, si sj : party, d : party, g:party) : matrix = {
+  proc jmp(x : int, si sj d g  :party) : matrix = {
     (* TODO: party d gets x from si, and H(x) from sj *)
     (* abort if hashes don't check out *)
-    (*var g : int;
+    var mjmp : matrix;
 
-    (* compute the excluded party g *)
-    var p : party fset; *)
-    (* remove current parties *)
-    var a, b: party fset;
-   
-    a <-  Top.FSet.oflist [si; sj; d];
-    b <-  Top.FSet.oflist [g];
-    g <- pick ( b `|` a `\` a);
     mjmp <- offunm ((fun p s =>
         if p = s then 0 else
         if g = s then x else 0), N, N);
     return mjmp;
-
   }
 
   (* parties i and j know x, and want to share it with the two other
-     parties.
+     parties g and h.
    *)
-  proc inp(x : int, i j : party, g h : party) : matrix = {
+  proc inp(x : int, i j g h : party) : matrix = {
     var r, xh : int;
-    var pgm : matrix;
-
-(*
-    (* figure out excluded parties g, h *)
-    var p : party fset;
-    p <- (rangeset 0 N) `\` Top.FSet.oflist [i; j];
-    g <- nth err (elems p) 0;
-    h <- nth err (elems p) 1;
-*)
+    var pgm, minp : matrix;
 
     (* in the paper this is a PRF, but for now model as truly random
        and just don't give it to party g. *)
@@ -426,40 +409,6 @@ proof.
 by rewrite range_ltn // range_ltn // range_ltn // rangeS.
 qed.
 
-lemma excluded_party (i j : int) :
-    exists(a, b : int),  a < b /\ a <> i /\ b <> j /\ 0 <= i < j < N 
-      => (rem i (rem j (range 0 N))) = [a; b].
-proof.
-rewrite _4p.
-(* i = 0 *)
-case (i = 0).
-case (j = 1); progress.
-exists 2 3.
-by rewrite range4.
-case (j = 2); progress.
-exists 1 3.
-by rewrite range4.
-exists 1 2.
-rewrite range4 /=.
-progress.
-have // : j = 3 by smt().
-(* i = 1 *)
-case (i = 1).
-case (j = 2); progress.
-exists 0 3.
-by rewrite range4.
-exists 0 2.
-rewrite range4 /=.
-progress.
-have // : j = 3 by smt().
-(* i = 2 *)
-progress.
-exists 0 1.
-rewrite range4 /=.
-progress.
-have // : i = 2 /\ j = 3 by smt().
-qed.
-
 lemma offunm_unwrap (i, j : party, f : party -> party -> int):
     0 <= i < N /\ 0 <= j < N => (offunm (fun(x y) => f x y, N, N)).[i, j] = f i j.
 proof.
@@ -471,34 +420,7 @@ by rewrite _4p.
 by simplify.
 qed.
 
-(* lemma pick_nonmem (s : party fset) :
-    forall k, k \in s => pick (rangeset 0 N `\` s) <> k.
-proof.
-admit.
-qed.
-( *progress.
-rewrite /pick.
-rewrite /(`\`).
-rewrite /rangeset.
-have : uniq (range 0 n).
-  by rewrite range_uniq.
-progress.
-rewrite oflist_uniq in H0.
-
-lemma nth_set (i : int, s : int list) :
-  uniq s => nth err (elems (oflist s)) i = nth err s i.
-proof.
-admit.
-qed.
-
-lemma oflist_cat (a b c : int list) :
-    a ++ b = c => oflist c `\` oflist b = oflist a.
-proof.
-admit.
-qed.
-*)
-
-
+(*
 (* Prove the union of two sets and difference of one of the sets results in the other set*)
 lemma fsetUD (A B: party fset) : A `|` B `\` B = A.
 proof.
@@ -510,15 +432,14 @@ qed.
 lemma pick1(x: int): pick( Top.FSet.oflist [x]) = x.
 proof. 
 admit.
-qed.
-
+qed.*)
 
 (* Prove correctness of the jmp. *)
 lemma jmp_correct(x_ si_ sj_ d_ g_: party) :
     hoare[F4.jmp : x = x_ /\ si = si_ /\ 
       sj = sj_ /\ d = d_ /\ g = g_ /\ 
     0<=g_ /\ g<=3 ==> open res = x_ /\ 
-    forall a, mrange F4.mjmp a a =>  F4.mjmp.[a, a] = 0].
+    forall a, mrange res a a => res.[a, a] = 0].
 proof.
 proc.
 (*Proof for open*)
@@ -535,9 +456,6 @@ rewrite rows_offunm cols_offunm => /=; smt(_4p).
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
 simplify.
-
-rewrite fsetUD.
-rewrite pick1.
 smt(sum_four).
 (*Proof for diagonal elements to be zero.*)
 smt(get_offunm).
@@ -548,7 +466,7 @@ lemma inp_correct(x_ i_ j_ g_ h_: party) :
     hoare[F4.inp : x = x_ /\ i = i_ /\ 
       j = j_ /\ h = h_ /\ g = g_ /\ 
     0<=h_ /\ h<=3 ==> open res = x_  /\ 
-    forall a, mrange F4.minp a a /\ a < N =>  F4.minp.[a, a] = 0].
+    forall a, mrange res a a /\ a < N => res.[a, a] = 0].
 proof.
 proc.
 (*Proof for open*)
@@ -576,8 +494,6 @@ rewrite rows_offunm cols_offunm => /=; smt(_4p).
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
 simplify.
-rewrite fsetUD.
-rewrite pick1.
 rewrite _4p.
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
@@ -613,7 +529,6 @@ rewrite rows_offunm cols_offunm => /=; smt(_4p).
 simplify => //.
 qed.
 
-
 lemma open_add (m1 m2 m3 m4 m5 m6 m7: matrix):
   open(m1 + m2 + m3 + m4 + m5 + m6 + m7) = open m1 + open m2 + open m3 + open m4 + open m5 + open m6 + open m7.
 proof.
@@ -622,7 +537,6 @@ rewrite /open.
 rewrite {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm {1}get_addm  {1}get_addm {1}get_addm {1}get_addm {1}get_addm.
 smt(get_addm addmA).
 qed.
-
 
 
 
@@ -672,8 +586,6 @@ rewrite rows_offunm cols_offunm => /=; smt(_4p).
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
 simplify.
-rewrite fsetUD.
-rewrite pick1.
 rewrite _4p.
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
@@ -728,8 +640,6 @@ rewrite rows_offunm cols_offunm => /=; smt(_4p).
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
 simplify.
-rewrite fsetUD.
-rewrite pick1.
 rewrite _4p.
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
@@ -788,8 +698,6 @@ rewrite rows_offunm cols_offunm => /=; smt(_4p).
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
 simplify.
-rewrite fsetUD.
-rewrite pick1.
 rewrite _4p.
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
@@ -850,8 +758,6 @@ rewrite rows_offunm cols_offunm => /=; smt(_4p).
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
 simplify.
-rewrite fsetUD.
-rewrite pick1.
 rewrite _4p.
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
@@ -914,8 +820,6 @@ rewrite rows_offunm cols_offunm => /=; smt(_4p).
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
 simplify.
-rewrite fsetUD.
-rewrite pick1.
 rewrite _4p.
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
@@ -980,8 +884,6 @@ rewrite rows_offunm cols_offunm => /=; smt(_4p).
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
 simplify.
-rewrite fsetUD.
-rewrite pick1.
 rewrite _4p.
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
@@ -1006,6 +908,7 @@ smt(sum_four).
 
 auto => />.
 progress.
+
 rewrite open_add. 
 rewrite H H0 H1 H2 H3 H4.
 
@@ -1021,6 +924,16 @@ rewrite rows_offunm cols_offunm => /=; smt(_4p).
 
 simplify.
 
+rewrite addrA mulzDl mulzDr.
+rewrite addrA mulzDl mulzDr.
+rewrite addrA mulzDl mulzDr.
+rewrite addrA mulzDl mulzDr.
+rewrite addrA mulzDl mulzDr.
+
+
+rewrite 8!addrA.
+rewrite 2!mulzDl.
+simplfiy.
 
 qed.
 

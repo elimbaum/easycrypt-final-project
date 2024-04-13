@@ -138,7 +138,7 @@ module F4 = {
     g <- pick ( b `|` a `\` a);
     return offunm ((fun p s =>
         if p = s then 0 else
-        if g = s && 0<=g && g<=3 then x else 0), N, N);
+        if g = s then x else 0), N, N);
 
   }
 

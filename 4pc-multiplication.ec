@@ -502,7 +502,7 @@ apply/fsetP => x.
 by rewrite fsetDv fsetUC fset0U.
 qed.
 
-(*Prove that picking the head from a single size set returns the single value*)
+(*Prove that picking the head from a single element set returns the single element*)
 lemma pick1(x: int): pick( Top.FSet.oflist [x]) = x.
 proof. 
 admit.

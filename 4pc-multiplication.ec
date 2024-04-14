@@ -337,6 +337,7 @@ rewrite (sum_four shares{hr}) // /#.
 qed.
 
 (* Prove the sharing scheme is secure. *)
+(* for any party, view of real and simulated matrices look the same *)
 lemma share_secure(p_ : party) :
     equiv[F4.share ~ Sim.share :
       ={p} /\ p{1} = p_ /\ 0 <= p_ < N
@@ -414,7 +415,7 @@ qed.
 (* need lemma valid shares *)
 
 (* Prove addition is correct *)
-(* TODO: don't open. use valid. *)
+(* TODO: don't open inside proc. use valid. *)
 lemma add_correct(x_ y_ : int) :
     hoare[F4.add_main : x = x_ /\ y = y_ ==> res = x_ + y_].
 proof.
@@ -433,12 +434,7 @@ progress.
 by rewrite open_linear.
 qed.
 
-lemma range4 :
-    range 0 4 = [0; 1; 2; 3].
-proof.
-by rewrite range_ltn // range_ltn // range_ltn // rangeS.
-qed.
-
+(* TODO: maybe do something like this to simplify all of the get/rows/cols proof steps below *)
 lemma offunm_unwrap (i, j : party, f : party -> party -> int):
     0 <= i < N /\ 0 <= j < N => (offunm (fun(x y) => f x y, N, N)).[i, j] = f i j.
 proof.
@@ -550,6 +546,8 @@ simplify.
 smt(_4p).
 qed.
 
+(* annoying, but if we try to smt() this down below without the intermediate lemma,
+   smt gets confused. (maybe too much in context) *)
 lemma add_rearrange (t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t13 t14 t15 t16 : int) :
    t1 +  t2 +  t3 +  t4 +  t5 +  t6 +  t7 +  t8 +
    t9 + t10 + t11 + t12 + t13 + t14 + t15 + t16 =
@@ -559,12 +557,14 @@ proof.
 smt().
 qed.
 
+(* TODO: validity *)
 (* Prove multiplication is correct *)
 lemma mul_correct(x_ y_ : int) :
     hoare[F4.mult_main : x = x_ /\ y = y_ ==> open res = x_ * y_].
 proof.
 proc.
 have n4 : N = 4 by rewrite _4p.
+(* expand sharing *)
 seq 1 : (open mx = x_ /\ y = y_).
 auto.
 call (share_correct x_ 0).
@@ -577,6 +577,7 @@ inline F4.mult.
 wp; sp.
 exists* mx, my.
 elim* => mx my.
+(* expand each inp call using lemma above *)
 call (inp_correct (mx.[0,3]*my.[0,2] + mx.[0,2]*my.[0,3]) 0 1 2 3).
 call (inp_correct (mx.[0,3]*my.[0,1] + mx.[0,1]*my.[0,3]) 0 2 1 3).
 call (inp_correct (mx.[0,2]*my.[0,1] + mx.[0,1]*my.[0,2]) 0 3 1 2).
@@ -588,6 +589,7 @@ progress.
 by rewrite n4.
 by rewrite n4.
 by rewrite n4.
+(* prove two sides open to the same matrix *)
 rewrite 6!open_linear.
 rewrite H1 H4 H7 H10 H13 H16.
 rewrite /open _4p.

@@ -76,11 +76,13 @@ op valid(m : matrix) =
    (* matrix is NxN *)
    size m = (N, N)
    (* diagonal is zero *)
-   /\ (
-    forall (s : int), mrange m s s => m.[s, s] = 0
-    (* off diagonal, each column identical for all parties *)
-    /\ (forall p, mrange m p s /\ p <> s => 
-          (if s = 0 then m.[p, s] = m.[1, 0] else m.[p, s] = m.[0,s]))).
+   /\ (forall (a : int), mrange m a a => m.[a, a] = 0)
+   (* off diagonal, each column identical for all parties *)
+   /\ forall s, forall p, mrange m p s /\ p <> s => 
+          (* for share 0, all shares equal to party 1's *)
+          (if s = 0 then m.[p, s] = m.[1, s]
+          (* for all other shares, equal to party 0's *)
+           else m.[p, s] = m.[0, s]).
 
 op view(m : matrix, p : party) =
   row m p.
@@ -283,7 +285,6 @@ qed.
 lemma share_correct(x_ : int, p_ : party) :
     hoare[F4.share: x = x_ /\ p = p_ /\ 0 <= p_ < N ==> valid res /\ open res = x_].
 proof.
-
 proc.
 seq 6 : (x = x_ /\ p = p_ /\ 0 <= p_ < N
   /\ size shares = N
@@ -535,26 +536,40 @@ rewrite get_offunm.
 rewrite rows_offunm cols_offunm.
 have plt4 : p < 4.
   move : H0.
-  rewrite rows_addm rowsn rows_offunm /#.
+  rewrite rows_addm rowsn rows_offunm //.
 trivial.
 rewrite get_offunm.
 by rewrite rows_offunm cols_offunm.
 simplify.
 have zneqp : 0 <> p by smt().
 rewrite zneqp /=.
-have r1eqp : result.[1, 0] = result.[p, 0].
-rewrite valid.
-
-
-
+have plt4 : p < 4.
+  move : H0.
+  rewrite rows_addm rowsn rows_offunm //.
+rewrite (valid 0).
+rewrite rowsn colsn //.
+by simplify.
+have plt4 : p < 4.
+  move : H0.
+  rewrite rows_addm rowsn rows_offunm //.
+have slt4 : s < 4.
+  move : H2.
+  rewrite cols_addm colsn cols_offunm //.
+rewrite 2!get_addm.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm //.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm //.
+simplify.
 have sneqp : s <> p by smt().
-rewrite sneqp /=.
-rewrite -(addIz (if s = h_ then r_ else 0)).
-apply (addIz (-(if s = h_ then r_ else 0))).
-
-
+rewrite sneqp H4 /=.
+have rpeq0 : result.[p, s] = result.[0, s].
+(* why can't we prove this from `valid` ??? *)
+admit.
+rewrite rpeq0.
+trivial.
 (* begin correctness proof *)
-rewrite opn_linear.
+rewrite open_linear.
 rewrite /open.
 rewrite get_offunm.
 rewrite cols_offunm rows_offunm /#.

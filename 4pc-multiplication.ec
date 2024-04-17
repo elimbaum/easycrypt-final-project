@@ -76,9 +76,11 @@ op valid(m : matrix) =
    (* matrix is NxN *)
    size m = (N, N)
    (* diagonal is zero *)
-   /\ (forall (a : int), mrange m a a => m.[a, a] = 0)
-   (* besides diagonal, each column identical *)
-   /\ (forall s, forall p, exists k, mrange m p s /\ p <> s => m.[p, s] = k).
+   /\ (
+    forall (s : int), mrange m s s => m.[s, s] = 0
+    (* off diagonal, each column identical for all parties *)
+    /\ (forall p, mrange m p s /\ p <> s => 
+          (if s = 0 then m.[p, s] = m.[1, 0] else m.[p, s] = m.[0,s]))).
 
 op view(m : matrix, p : party) =
   row m p.
@@ -317,11 +319,18 @@ rewrite cols_offunm _4p lez_maxr //.
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm //.
 by simplify.
-exists (nth err shares{hr} s).
-progress.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm // lez_maxr //.
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm // lez_maxr //.
 by rewrite /= H4 /=.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm // lez_maxr //.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm // lez_maxr //.
+rewrite /= H4 /=.
+have H5p : 0 <> s by smt().
+by rewrite H5p /=.
 (* correct *)
 rewrite /open get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
@@ -463,12 +472,17 @@ rewrite cols_offunm _4p lez_maxr //.
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm /= lez_maxr //.
 by simplify.
-exists (if g{hr} = s then x{hr} else 0).
-progress.
 rewrite get_offunm.
-rewrite rows_offunm cols_offunm lez_maxr //.
-simplify.
-rewrite H5 /= //.
+rewrite rows_offunm cols_offunm /= lez_maxr //.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm /= lez_maxr //.
+by rewrite /= H5 /=.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm /= lez_maxr //.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm /= lez_maxr //.
+have H6p : 0 <> s by smt().
+by rewrite /= H5 H6p /=.
 rewrite /open.
 rewrite get_offunm.
 by rewrite rows_offunm cols_offunm => /=.
@@ -516,23 +530,31 @@ rewrite rows_offunm cols_offunm /#.
 simplify.
 by rewrite diag0.
 (* columns are equal *)
-exists (result.[p, s] + if s = h_ then r_ else 0).
-progress.
-rewrite get_addm.
+rewrite 2!get_addm.
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm.
 have plt4 : p < 4.
   move : H0.
   rewrite rows_addm rowsn rows_offunm /#.
-have slt4 : s < 4.
-  move : H2.
-  rewrite cols_addm colsn cols_offunm /#.
-smt().
+trivial.
+rewrite get_offunm.
+by rewrite rows_offunm cols_offunm.
 simplify.
+have zneqp : 0 <> p by smt().
+rewrite zneqp /=.
+have r1eqp : result.[1, 0] = result.[p, 0].
+rewrite valid.
+
+
+
 have sneqp : s <> p by smt().
-by rewrite sneqp /=.
+rewrite sneqp /=.
+rewrite -(addIz (if s = h_ then r_ else 0)).
+apply (addIz (-(if s = h_ then r_ else 0))).
+
+
 (* begin correctness proof *)
-rewrite open_linear.
+rewrite opn_linear.
 rewrite /open.
 rewrite get_offunm.
 rewrite cols_offunm rows_offunm /#.

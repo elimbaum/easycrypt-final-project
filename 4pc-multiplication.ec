@@ -789,14 +789,12 @@ call (inp_correct (mx.[0,3]*my.[1,0] + mx.[1,0]*my.[0,3]) 1 2 0 3).
 call (inp_correct (mx.[0,2]*my.[1,0] + mx.[1,0]*my.[0,2]) 1 3 0 2).
 call (inp_correct (mx.[0,1]*my.[1,0] + mx.[1,0]*my.[0,1]) 2 3 0 1).
 
-auto.
+auto => />.
 progress.
-
 by rewrite n4.
 by rewrite n4.
 by rewrite n4.
 (* prove two sides open to the same matrix *)
-
 
 rewrite 6!open_linear.
 

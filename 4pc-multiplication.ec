@@ -733,26 +733,114 @@ proof.
 smt().
 qed.
 
+
+
+lemma add_correct1(x_ y_ : int) :
+    hoare[F4.add_main : x = x_ /\ y = y_ ==> valid res /\ open res = x_ + y_].
+proof.
+proc.
+have n4 : N = 4 by rewrite _4p.
+seq 1 : (open mx = x_ /\ y = y_ /\ rows mx = Top.N /\ cols mx = Top.N /\
+        (forall (a : int), mrange mx a a => mx.[a, a] = 0) /\
+         forall s, forall p, mrange mx p s /\ p <> s => 
+          (if s = 0 then mx.[p, s] = mx.[1, s]
+           else mx.[p, s] = mx.[0, s])).
+auto.
+call (share_correct x_ 0).
+auto => />; progress; smt().
+seq 1 : (open mx = x_ /\ rows mx = Top.N /\ cols mx = Top.N /\ 
+        (forall (a : int), mrange mx a a => mx.[a, a] = 0) /\
+         (forall s, forall p, mrange mx p s /\ p <> s => 
+         (if s = 0 then mx.[p, s] = mx.[1, s]
+          else mx.[p, s] = mx.[0, s])) /\         
+         open my = y_ /\ rows my = Top.N /\ cols my = Top.N /\ 
+        (forall (a : int), mrange my a a => my.[a, a] = 0) /\
+        (forall s, forall p, mrange my p s /\ p <> s => 
+          (if s = 0 then my.[p, s] = my.[1, s]
+           else my.[p, s] = my.[0, s]))).
+call (share_correct y_ 1).
+(*Validity proof*)
+auto => />; progress; smt().
+wp.
+auto => />.
+move => &hr rows_mx cols_mx diag_mx not_diag_mx rows_my cols_my diag_my not_diag_my.
+progress.
+rewrite rows_addm rows_mx rows_my /#.
+rewrite cols_addm cols_mx cols_my /#.
+rewrite get_addm; smt().
+rewrite 2!get_addm.
+have mxp0_eq_mx10: mrange mx{hr} p 0 /\ p <> 0 => mx{hr}.[p,0] = mx{hr}.[1, 0] by smt().
+rewrite mxp0_eq_mx10.
+rewrite H.
+rewrite rows_addm in H0.
+smt().
+have myp0_eq_my10: mrange my{hr} p 0 /\ p <> 0 => my{hr}.[p,0] = my{hr}.[1, 0] by smt().
+rewrite myp0_eq_my10.
+rewrite H.
+rewrite rows_addm in H0.
+smt().
+smt().
+
+rewrite 2!get_addm.
+have mxps_eq_mx0s: mrange mx{hr} p s /\ p <> s /\ s <> 0 => mx{hr}.[p,s] = mx{hr}.[0, s].
+progress.
+by smt().
+rewrite mxps_eq_mx0s.
+progress.
+rewrite rows_addm in H0.
+smt().
+rewrite cols_addm in H2.
+smt().
+have myps_eq_my0s: mrange my{hr} p s /\ p <> s /\ s <> 0 => my{hr}.[p,s] = my{hr}.[0, s]. 
+progress.
+by smt().
+rewrite  myps_eq_my0s.
+progress.
+rewrite rows_addm in H0.
+smt().
+rewrite cols_addm in H2.
+smt().
+smt().
+(*Corretness proof*)
+by rewrite open_linear.
+qed.
+
+
 (* TODO: validity *)
 (* Prove multiplication is correct *)
 lemma mul_correct(x_ y_ : int) :
-    hoare[F4.mult_main : x = x_ /\ y = y_ ==> open res = x_ * y_].
+    hoare[F4.mult_main : x = x_ /\ y = y_ ==> open res = x_ * y_ /\ valid res].
 proof.
 proc.
 have n4 : N = 4 by rewrite _4p.
 (* expand sharing *)
-seq 1 : (open mx = x_ /\ y = y_).
+seq 1 : (open mx = x_ /\ y = y_ /\ rows mx = Top.N /\ cols mx = Top.N /\
+        (forall (a : int), mrange mx a a => mx.[a, a] = 0) /\
+         forall s, forall p, mrange mx p s /\ p <> s => 
+          (if s = 0 then mx.[p, s] = mx.[1, s]
+           else mx.[p, s] = mx.[0, s])).
 auto.
 call (share_correct x_ 0).
-auto; smt().
-seq 1 : (open mx = x_ /\ open my = y_).
-auto.
+auto => />; progress; smt().
+seq 1 : (open mx = x_ /\ rows mx = Top.N /\ cols mx = Top.N /\ 
+        (forall (a : int), mrange mx a a => mx.[a, a] = 0) /\
+         (forall s, forall p, mrange mx p s /\ p <> s => 
+         (if s = 0 then mx.[p, s] = mx.[1, s]
+          else mx.[p, s] = mx.[0, s])) /\         
+         open my = y_ /\ rows my = Top.N /\ cols my = Top.N /\ 
+        (forall (a : int), mrange my a a => my.[a, a] = 0) /\
+        (forall s, forall p, mrange my p s /\ p <> s => 
+          (if s = 0 then my.[p, s] = my.[1, s]
+           else my.[p, s] = my.[0, s]))).
+
 call (share_correct y_ 1).
-auto; smt().
+(*Validity proof*)
+auto => />; progress; smt().
 inline F4.mult.
 wp; sp.
 exists* mx, my.
 elim* => mx my.
+
 (* expand each inp call using lemma above *)
 call (inp_correct (mx.[0,3]*my.[0,2] + mx.[0,2]*my.[0,3]) 0 1 2 3).
 call (inp_correct (mx.[0,3]*my.[0,1] + mx.[0,1]*my.[0,3]) 0 2 1 3).
@@ -760,14 +848,15 @@ call (inp_correct (mx.[0,2]*my.[0,1] + mx.[0,1]*my.[0,2]) 0 3 1 2).
 call (inp_correct (mx.[0,3]*my.[1,0] + mx.[1,0]*my.[0,3]) 1 2 0 3).
 call (inp_correct (mx.[0,2]*my.[1,0] + mx.[1,0]*my.[0,2]) 1 3 0 2).
 call (inp_correct (mx.[0,1]*my.[1,0] + mx.[1,0]*my.[0,1]) 2 3 0 1).
-auto.
+auto => />.
 progress.
 by rewrite n4.
 by rewrite n4.
 by rewrite n4.
 (* prove two sides open to the same matrix *)
 rewrite 6!open_linear.
-rewrite H1 H4 H7 H10 H13 H16.
+
+rewrite H12 H18 H24 H29 H34 H39.
 rewrite /open _4p.
 rewrite get_offunm.
 by rewrite cols_offunm rows_offunm lez_maxr.
@@ -781,6 +870,476 @@ simplify.
 (* algebra *)
 rewrite 3!mulzDr 12!mulzDl.
 rewrite 17!addrA.
-rewrite add_rearrange. by simplify.
+rewrite add_rearrange. 
+by simplify.
+(*Mult correct validity proof*)
+rewrite 6!rows_addm.
+
+
+rewrite H8 H14 H20 H25 H30 H35.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+rewrite 6!cols_addm.
+
+rewrite H9 H15 H21 H26 H31 H36.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+rewrite 6!get_addm.
+rewrite get_offunm.
+rewrite cols_offunm rows_offunm.
+rewrite n4.
+rewrite /max.
+simplify.
+progress.
+
+
+move: H41.
+rewrite 6!rows_addm.
+rewrite H8 H14 H20 H25 H30 H35.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+move: H41.
+rewrite 6!rows_addm.
+rewrite H8 H14 H20 H25 H30 H35.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+*trivial.
+
+(*Proof Diagonal zero*)
+(*result.[a, a] = 0*)
+rewrite H10.
+progress.
+rewrite H8 n4.
+
+move: H41.
+rewrite 6!rows_addm.
+rewrite H8 H14 H20 H25 H30 H35.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+move: H41.
+rewrite 6!rows_addm.
+rewrite H8 H14 H20 H25 H30 H35.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+rewrite H9 n4.
+trivial.
+
+(*result0.[a, a] = 0*)
+rewrite H16.
+progress.
+rewrite H14 n4.
+
+move: H41.
+rewrite 6!rows_addm.
+rewrite H8 H14 H20 H25 H30 H35.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+move: H41.
+rewrite 6!rows_addm.
+rewrite H8 H14 H20 H25 H30 H35.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+rewrite H15 n4.
+trivial.
+
+
+(*result1.[a, a] = 0*)
+rewrite H22.
+progress.
+rewrite H20 n4.
+
+move: H41.
+rewrite 6!rows_addm.
+rewrite H8 H14 H20 H25 H30 H35.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+move: H41.
+rewrite 6!rows_addm.
+rewrite H8 H14 H20 H25 H30 H35.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+rewrite H21 n4.
+trivial.
+
+
+(*result2.[a, a] = 0*)
+rewrite H27.
+progress.
+rewrite H25 n4.
+
+move: H41.
+rewrite 6!rows_addm.
+rewrite H8 H14 H20 H25 H30 H35.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+move: H41.
+rewrite 6!rows_addm.
+rewrite H8 H14 H20 H25 H30 H35.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+rewrite H26 n4.
+trivial.
+
+
+(*result3.[a, a] = 0*)
+rewrite H32.
+progress.
+rewrite H30 n4.
+
+move: H41.
+rewrite 6!rows_addm.
+rewrite H8 H14 H20 H25 H30 H35.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+move: H41.
+rewrite 6!rows_addm.
+rewrite H8 H14 H20 H25 H30 H35.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+rewrite H31 n4.
+trivial.
+
+
+
+(*result4.[a, a] = 0*)
+rewrite H37.
+progress.
+rewrite H35 n4.
+
+move: H41.
+rewrite 6!rows_addm.
+rewrite H8 H14 H20 H25 H30 H35.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+move: H41.
+rewrite 6!rows_addm.
+rewrite H8 H14 H20 H25 H30 H35.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+rewrite H36 n4.
+trivial.
+simplify.
+trivial.
+
+(*Proof that columns are equal when s = 0*)
+rewrite 12!get_addm.
+rewrite get_offunm.
+rewrite rows_offunm lez_maxr // n4 //.
+rewrite cols_offunm lez_maxr //. 
+progress.
+move: H41.
+rewrite 6!rows_addm.
+rewrite H8 H14 H20 H25 H30 H35.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+
+trivial.
+
+rewrite get_offunm.
+rewrite rows_offunm lez_maxr // n4 //.
+simplify.
+have zero_noteq_p: 0 <> p. 
+rewrite (not_eq p 0).
+by rewrite H44.
+trivial.
+rewrite zero_noteq_p.
+simplify.
+
+
+(*result.[p, 0] = result.[1, 0]*)
+have resultp0_eq_result10:  mrange result p 0 /\ p <> 0 => result.[p,0] = result.[1, 0].
+progress.
+rewrite (H11 0 p).
+progress.
+trivial.
+
+(*result0.[p, 0] = result0.[1, 0]*)
+have result0p0_eq_result010:  mrange result0 p 0 /\ p <> 0 => result0.[p,0] = result0.[1, 0].
+progress.
+rewrite (H17 0 p).
+progress.
+trivial.
+
+
+(*result1.[p, 0] = result1.[1, 0]*)
+have result1p0_eq_result110:  mrange result1 p 0 /\ p <> 0 => result1.[p,0] = result1.[1, 0].
+progress.
+rewrite (H23 0 p).
+progress.
+trivial.
+
+
+(*result2.[p, 0] = result2.[1, 0]*)
+have result2p0_eq_result210:  mrange result2 p 0 /\ p <> 0 => result2.[p,0] = result2.[1, 0].
+progress.
+rewrite (H28 0 p).
+progress.
+trivial.
+
+
+(*result3.[p, 0] = result3.[1, 0]*)
+have result3p0_eq_result310:  mrange result3 p 0 /\ p <> 0 => result3.[p,0] = result3.[1, 0].
+progress.
+rewrite (H33 0 p).
+progress.
+trivial.
+
+
+(*result4.[p, 0] = result4.[1, 0]*)
+have result4p0_eq_result410:  mrange result4 p 0 /\ p <> 0 => result4.[p,0] = result4.[1, 0].
+progress.
+rewrite (H38 0 p).
+progress.
+trivial.
+
+
+(*mx.[p, 0] = mx.[1, 0]*)
+have mxp0_eq_mx10:  mrange mx p 0 /\ p <> 0 => mx.[p,0] = mx.[1, 0].
+progress.
+rewrite (H2 0 p).
+progress.
+trivial.
+
+
+(*my.[p, 0] = my.[1, 0]*)
+have myp0_eq_my10:  mrange my p 0 /\ p <> 0 => my.[p,0] = my.[1, 0].
+progress.
+rewrite (H6 0 p).
+progress.
+trivial.
+
+rewrite resultp0_eq_result10.
+progress.
+rewrite H8 n4.
+move: H41.
+rewrite 6!rows_addm.
+rewrite H8 H14 H20 H25 H30 H35.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+rewrite H9 n4 //.
+
+
+rewrite result0p0_eq_result010.
+progress.
+rewrite H14 n4.
+move: H41.
+rewrite 6!rows_addm.
+rewrite H8 H14 H20 H25 H30 H35.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+rewrite H15 n4 //.
+
+rewrite result1p0_eq_result110.
+progress.
+rewrite H20 n4.
+move: H41.
+rewrite 6!rows_addm.
+rewrite H8 H14 H20 H25 H30 H35.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+rewrite H21 n4 //.
+
+
+rewrite result2p0_eq_result210.
+progress.
+rewrite H25 n4.
+move: H41.
+rewrite 6!rows_addm.
+rewrite H8 H14 H20 H25 H30 H35.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+rewrite H26 n4 //.
+
+
+rewrite result3p0_eq_result310.
+progress.
+rewrite H30 n4.
+move: H41.
+rewrite 6!rows_addm.
+rewrite H8 H14 H20 H25 H30 H35.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+rewrite H31 n4 //.
+
+rewrite result4p0_eq_result410.
+progress.
+rewrite H35 n4.
+move: H41.
+rewrite 6!rows_addm.
+rewrite H8 H14 H20 H25 H30 H35.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+rewrite H36 n4 //.
+
+
+rewrite mxp0_eq_mx10.
+progress.
+rewrite H n4.
+move: H41.
+rewrite 6!rows_addm.
+rewrite H8 H14 H20 H25 H30 H35.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+rewrite H0 n4 //.
+
+rewrite myp0_eq_my10.
+progress.
+rewrite H3 n4.
+move: H41.
+rewrite 6!rows_addm.
+rewrite H8 H14 H20 H25 H30 H35.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+rewrite H4 n4 //.
+trivial.
+
+
+
+
+
+(*Proof that columns are Equal when s<>0*)
+
+rewrite 12!get_addm.
+rewrite get_offunm.
+rewrite rows_offunm lez_maxr // n4 //.
+rewrite cols_offunm lez_maxr //. 
+progress.
+move: H41.
+rewrite 6!rows_addm.
+rewrite H8 H14 H20 H25 H30 H35.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+move: H43.
+rewrite 6!cols_addm.
+rewrite H9 H15 H21 H26 H31 H36.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+
+rewrite get_offunm.
+rewrite rows_offunm lez_maxr // n4 //.
+rewrite cols_offunm lez_maxr //. 
+simplify.
+rewrite H42.
+move: H43.
+rewrite 6!cols_addm.
+rewrite H9 H15 H21 H26 H31 H36.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+simplify.
+rewrite H45.
+
+have s_noteq_p: s <> p. 
+rewrite (not_eq p s).
+by rewrite H44.
+trivial.
+rewrite s_noteq_p.
+simplify.
+
+
+(*result.[p, s] = result.[0, s]*)
+have resultps_eq_result0s:  mrange result p s => result.[p,s] = result.[0, s].
+progress.
+
+(*H44 H45 and H11 proves the above relation*)
+admit.
+
+
+admit.
+
+
 qed.
 

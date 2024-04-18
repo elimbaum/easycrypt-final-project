@@ -797,6 +797,7 @@ by rewrite n4.
 by rewrite n4.
 (* prove two sides open to the same matrix *)
 
+
 rewrite 6!open_linear.
 
 rewrite H15 H22 H29 H35 H41 H47.

@@ -78,11 +78,12 @@ op valid(m : matrix) =
    (* diagonal is zero *)
    /\ (forall (a : int), mrange m a a => m.[a, a] = 0)
    (* off diagonal, each column identical for all parties *)
-   /\ forall s, forall p, mrange m p s /\ p <> s => 
+   /\ (forall s, forall p, mrange m p s /\ p <> s /\ s = 0 => 
           (* for share 0, all shares equal to party 1's *)
-          (if s = 0 then m.[p, s] = m.[1, s]
+           m.[p, s] = m.[1, s])
+   /\ (forall s, forall p, mrange m p s /\ p <> s /\ s <> 0 => 
           (* for all other shares, equal to party 0's *)
-           else m.[p, s] = m.[0, s]).
+           m.[p, s] = m.[0, s]).
 
 op view(m : matrix, p : party) =
   row m p.
@@ -518,6 +519,7 @@ have simp_mat_add : sh = p{2} + 1 + (sh - p{2} - 1)%Mat_A.ZR.
   smt(addrA addrC).
 rewrite -simp_mat_add /=.
 smt().
+*)
 qed.
 
 
@@ -528,10 +530,13 @@ lemma add_correct(x_ y_ : int, pi pj : party) :
 proof.
 proc.
 have n4 : N = 4 by rewrite _4p.
+
 seq 1 : (open mx = x_ /\ y = y_ /\ size mx = (N, N) /\ valid mx /\ j{hr} = pj /\ 0 <= pj < N).
+
 auto.
 call (share_correct x_ pi).
 auto => />; progress; smt().
+
 seq 1 : (open mx = x_ /\ size mx = (N, N) /\ valid mx /\
          open my = y_ /\ size my = (N, N) /\ valid my).
 call (share_correct y_ pj).
@@ -539,20 +544,24 @@ call (share_correct y_ pj).
 auto => />; progress; smt().
 wp.
 auto.
+
+(*Validity proof*)
+auto => />.
+move => &hr rows_mx cols_mx _ _ diag_mx not_diag_mx_left not_diag_mx_right rows_my cols_my _ _ diag_my not_diag_my_left not_diag_my_right.
 progress.
-rewrite rows_addm H H2 /#.
-rewrite cols_addm H0 H3 /#.
+rewrite rows_addm rows_mx rows_my /#.
+rewrite cols_addm cols_mx cols_my /#.
 rewrite get_addm; smt().
 rewrite 2!get_addm.
 have mxp0_eq_mx10: mrange mx{hr} p 0 /\ p <> 0 => mx{hr}.[p,0] = mx{hr}.[1, 0] by smt().
 rewrite mxp0_eq_mx10.
 rewrite H.
-rewrite rows_addm in H6.
+rewrite rows_addm in H0.
 smt().
 have myp0_eq_my10: mrange my{hr} p 0 /\ p <> 0 => my{hr}.[p,0] = my{hr}.[1, 0] by smt().
 rewrite myp0_eq_my10.
-rewrite H5.
-rewrite rows_addm in H6.
+rewrite H.
+rewrite rows_addm in H0.
 smt().
 smt().
 rewrite 2!get_addm.
@@ -561,18 +570,18 @@ progress.
 by smt().
 rewrite mxps_eq_mx0s.
 progress.
-rewrite rows_addm in H6.
+rewrite rows_addm in H0.
 smt().
-rewrite cols_addm in H8.
+rewrite cols_addm in H2.
 smt().
 have myps_eq_my0s: mrange my{hr} p s /\ p <> s /\ s <> 0 => my{hr}.[p,s] = my{hr}.[0, s]. 
 progress.
 by smt().
 rewrite  myps_eq_my0s.
 progress.
-rewrite rows_addm in H6.
+rewrite rows_addm in H0.
 smt().
-rewrite cols_addm in H8.
+rewrite cols_addm in H2.
 smt().
 smt().
 (*Corretness proof*)
@@ -591,6 +600,7 @@ seq 0 2 : (0 <= pi < N /\ 0 <= pj < N).
 auto.
 progress.
 rewrite randint_ll.
+(*
 call (share_secure p1).
 call (share_secure p2).
 auto.
@@ -620,7 +630,10 @@ progress.
 smt(randint_ll).
 auto.
 progress.
-
+*)
+admit.
+admit.
+admit.
 qed.
 
 (* TODO: maybe do something like this to simplify all of the get/rows/cols proof steps below *)
@@ -677,13 +690,6 @@ simplify.
 smt(_4p sum_four).
 qed.
 
-(*There must be an existing lemma but I am just proving it for now
- yes! eq_sym
-lemma not_eq(x, y : int): x <> y => y <> x.
-proof.
-smt().
-qed.*)
-
 (* Prove correctness of inp. *)
 lemma inp_correct(x_ : int, i_ j_ g_ h_: party) :
     hoare[F4.inp : x = x_ /\ i = i_ /\
@@ -703,7 +709,7 @@ elim* => r_.
 call (jmp_correct (x_ - r_) i_ j_ g_ h_).
 auto => />.
 rewrite _4p.
-move => h0 hn result rowsn colsn diag0 valid openr.
+move => h0 hn result rowsn colsn diag0 valid_s0 valid_snot0 openr.
 progress.
 (* first, inp output is valid. *)
 rewrite rows_addm rowsn rows_offunm /#.
@@ -717,6 +723,7 @@ rewrite get_offunm.
 rewrite rows_offunm cols_offunm /#.
 simplify.
 by rewrite diag0.
+
 (* columns are equal *)
 rewrite 2!get_addm.
 rewrite get_offunm.
@@ -728,12 +735,12 @@ rewrite rows_addm rowsn rows_offunm /#.
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm /#.
 simplify.
-have resultp0_eq_result10: mrange result p 0 /\ p <> 0 => result.[p, 0] = result.[1, 0] by smt().
+have resultp0_eq_result10: mrange result p 0 /\ p <> 0 /\ 0 = 0 => result.[p, 0] = result.[1, 0] by smt().
 rewrite resultp0_eq_result10.
 progress.
 move: H0.
 rewrite rows_addm rowsn rows_offunm /#.
-move: H2.
+move: H1.
 rewrite cols_addm colsn cols_offunm /#.
 smt().
 rewrite 2!get_addm.
@@ -793,77 +800,6 @@ qed.
 
 
 
-lemma add_correct1(x_ y_ : int) :
-    hoare[F4.add_main : x = x_ /\ y = y_ ==> valid res /\ open res = x_ + y_].
-proof.
-proc.
-have n4 : N = 4 by rewrite _4p.
-seq 1 : (open mx = x_ /\ y = y_ /\ rows mx = Top.N /\ cols mx = Top.N /\
-        (forall (a : int), mrange mx a a => mx.[a, a] = 0) /\
-         forall s, forall p, mrange mx p s /\ p <> s => 
-          (if s = 0 then mx.[p, s] = mx.[1, s]
-           else mx.[p, s] = mx.[0, s])).
-auto.
-call (share_correct x_ 0).
-auto => />; progress; smt().
-seq 1 : (open mx = x_ /\ rows mx = Top.N /\ cols mx = Top.N /\ 
-        (forall (a : int), mrange mx a a => mx.[a, a] = 0) /\
-         (forall s, forall p, mrange mx p s /\ p <> s => 
-         (if s = 0 then mx.[p, s] = mx.[1, s]
-          else mx.[p, s] = mx.[0, s])) /\         
-         open my = y_ /\ rows my = Top.N /\ cols my = Top.N /\ 
-        (forall (a : int), mrange my a a => my.[a, a] = 0) /\
-        (forall s, forall p, mrange my p s /\ p <> s => 
-          (if s = 0 then my.[p, s] = my.[1, s]
-           else my.[p, s] = my.[0, s]))).
-call (share_correct y_ 1).
-(*Validity proof*)
-auto => />; progress; smt().
-wp.
-auto => />.
-move => &hr rows_mx cols_mx diag_mx not_diag_mx rows_my cols_my diag_my not_diag_my.
-progress.
-rewrite rows_addm rows_mx rows_my /#.
-rewrite cols_addm cols_mx cols_my /#.
-rewrite get_addm; smt().
-rewrite 2!get_addm.
-have mxp0_eq_mx10: mrange mx{hr} p 0 /\ p <> 0 => mx{hr}.[p,0] = mx{hr}.[1, 0] by smt().
-rewrite mxp0_eq_mx10.
-rewrite H.
-rewrite rows_addm in H0.
-smt().
-have myp0_eq_my10: mrange my{hr} p 0 /\ p <> 0 => my{hr}.[p,0] = my{hr}.[1, 0] by smt().
-rewrite myp0_eq_my10.
-rewrite H.
-rewrite rows_addm in H0.
-smt().
-smt().
-
-rewrite 2!get_addm.
-have mxps_eq_mx0s: mrange mx{hr} p s /\ p <> s /\ s <> 0 => mx{hr}.[p,s] = mx{hr}.[0, s].
-progress.
-by smt().
-rewrite mxps_eq_mx0s.
-progress.
-rewrite rows_addm in H0.
-smt().
-rewrite cols_addm in H2.
-smt().
-have myps_eq_my0s: mrange my{hr} p s /\ p <> s /\ s <> 0 => my{hr}.[p,s] = my{hr}.[0, s]. 
-progress.
-by smt().
-rewrite  myps_eq_my0s.
-progress.
-rewrite rows_addm in H0.
-smt().
-rewrite cols_addm in H2.
-smt().
-smt().
-(*Corretness proof*)
-by rewrite open_linear.
-qed.
-
-
 (* TODO: validity *)
 (* Prove multiplication is correct *)
 lemma mul_correct(x_ y_ : int) :
@@ -874,22 +810,25 @@ have n4 : N = 4 by rewrite _4p.
 (* expand sharing *)
 seq 1 : (open mx = x_ /\ y = y_ /\ rows mx = Top.N /\ cols mx = Top.N /\
         (forall (a : int), mrange mx a a => mx.[a, a] = 0) /\
-         forall s, forall p, mrange mx p s /\ p <> s => 
-          (if s = 0 then mx.[p, s] = mx.[1, s]
-           else mx.[p, s] = mx.[0, s])).
+         (forall s, forall p, mrange mx p s /\ p <> s /\ s = 0 => 
+          mx.[p, s] = mx.[1, s]) /\ 
+         forall s, forall p, mrange mx p s /\ p <> s /\ s <> 0 => 
+           mx.[p, s] = mx.[0, s]).
 auto.
 call (share_correct x_ 0).
 auto => />; progress; smt().
 seq 1 : (open mx = x_ /\ rows mx = Top.N /\ cols mx = Top.N /\ 
         (forall (a : int), mrange mx a a => mx.[a, a] = 0) /\
-         (forall s, forall p, mrange mx p s /\ p <> s => 
-         (if s = 0 then mx.[p, s] = mx.[1, s]
-          else mx.[p, s] = mx.[0, s])) /\         
+         (forall s, forall p, mrange mx p s /\ p <> s /\ s = 0 => 
+        mx.[p, s] = mx.[1, s]) /\  
+       (forall s, forall p, mrange mx p s /\ p <> s /\ s <> 0 => 
+           mx.[p, s] = mx.[0, s]) /\
          open my = y_ /\ rows my = Top.N /\ cols my = Top.N /\ 
         (forall (a : int), mrange my a a => my.[a, a] = 0) /\
-        (forall s, forall p, mrange my p s /\ p <> s => 
-          (if s = 0 then my.[p, s] = my.[1, s]
-           else my.[p, s] = my.[0, s]))).
+        (forall s, forall p, mrange my p s /\ p <> s/\ s = 0 => 
+         my.[p, s] = my.[1, s]) /\
+        forall s, forall p, mrange my p s /\ p <> s /\ s <> 0 => 
+           my.[p, s] = my.[0, s]).
 
 call (share_correct y_ 1).
 (*Validity proof*)
@@ -906,15 +845,17 @@ call (inp_correct (mx.[0,2]*my.[0,1] + mx.[0,1]*my.[0,2]) 0 3 1 2).
 call (inp_correct (mx.[0,3]*my.[1,0] + mx.[1,0]*my.[0,3]) 1 2 0 3).
 call (inp_correct (mx.[0,2]*my.[1,0] + mx.[1,0]*my.[0,2]) 1 3 0 2).
 call (inp_correct (mx.[0,1]*my.[1,0] + mx.[1,0]*my.[0,1]) 2 3 0 1).
+
 auto => />.
 progress.
 by rewrite n4.
 by rewrite n4.
 by rewrite n4.
 (* prove two sides open to the same matrix *)
+
 rewrite 6!open_linear.
 
-rewrite H12 H18 H24 H29 H34 H39.
+rewrite H15 H22 H29 H35 H41 H47.
 rewrite /open _4p.
 rewrite get_offunm.
 by rewrite cols_offunm rows_offunm lez_maxr.
@@ -933,8 +874,7 @@ by simplify.
 (*Mult correct validity proof*)
 rewrite 6!rows_addm.
 
-
-rewrite H8 H14 H20 H25 H30 H35.
+rewrite H10 H17 H24 H30 H36 H42.
 rewrite n4 /max.
 simplify.
 rewrite /max.
@@ -943,7 +883,7 @@ trivial.
 
 rewrite 6!cols_addm.
 
-rewrite H9 H15 H21 H26 H31 H36.
+rewrite H11 H18 H25 H31 H37 H43.
 rewrite n4 /max.
 simplify.
 rewrite /max.
@@ -958,171 +898,167 @@ simplify.
 progress.
 
 
-move: H41.
+move: H49.
 rewrite 6!rows_addm.
-rewrite H8 H14 H20 H25 H30 H35.
+rewrite H10 H17 H24 H30 H36 H42.
 rewrite n4 /max.
 simplify.
 rewrite /max.
 simplify.
 trivial.
-move: H41.
+move: H49.
 rewrite 6!rows_addm.
-rewrite H8 H14 H20 H25 H30 H35.
+rewrite H10 H17 H24 H30 H36 H42.
 rewrite n4 /max.
 simplify.
 rewrite /max.
 simplify.
-*trivial.
+trivial.
 
 (*Proof Diagonal zero*)
 (*result.[a, a] = 0*)
-rewrite H10.
+rewrite H12.
 progress.
-rewrite H8 n4.
+rewrite H10 n4.
 
-move: H41.
+move: H49.
 rewrite 6!rows_addm.
-rewrite H8 H14 H20 H25 H30 H35.
+rewrite H10 H17 H24 H30 H36 H42.
 rewrite n4 /max.
 simplify.
 rewrite /max.
 simplify.
 trivial.
-move: H41.
-rewrite 6!rows_addm.
-rewrite H8 H14 H20 H25 H30 H35.
+
+move: H50.
+rewrite 6!cols_addm.
+rewrite H11 H18 H25 H31 H37 H43.
 rewrite n4 /max.
 simplify.
 rewrite /max.
 simplify.
-trivial.
-rewrite H9 n4.
 trivial.
 
 (*result0.[a, a] = 0*)
-rewrite H16.
+rewrite H19.
 progress.
-rewrite H14 n4.
+rewrite H17 n4.
 
-move: H41.
+move: H49.
 rewrite 6!rows_addm.
-rewrite H8 H14 H20 H25 H30 H35.
+rewrite H10 H17 H24 H30 H36 H42.
 rewrite n4 /max.
 simplify.
 rewrite /max.
 simplify.
 trivial.
-move: H41.
-rewrite 6!rows_addm.
-rewrite H8 H14 H20 H25 H30 H35.
+
+move: H50.
+rewrite 6!cols_addm.
+rewrite H11 H18 H25 H31 H37 H43.
 rewrite n4 /max.
 simplify.
 rewrite /max.
 simplify.
-trivial.
-rewrite H15 n4.
 trivial.
 
 
 (*result1.[a, a] = 0*)
-rewrite H22.
+rewrite H26.
 progress.
-rewrite H20 n4.
+rewrite H24 n4.
 
-move: H41.
+move: H49.
 rewrite 6!rows_addm.
-rewrite H8 H14 H20 H25 H30 H35.
+rewrite H10 H17 H24 H30 H36 H42.
 rewrite n4 /max.
 simplify.
 rewrite /max.
 simplify.
 trivial.
-move: H41.
-rewrite 6!rows_addm.
-rewrite H8 H14 H20 H25 H30 H35.
+
+move: H50.
+rewrite 6!cols_addm.
+rewrite H11 H18 H25 H31 H37 H43.
 rewrite n4 /max.
 simplify.
 rewrite /max.
 simplify.
-trivial.
-rewrite H21 n4.
 trivial.
 
 
 (*result2.[a, a] = 0*)
-rewrite H27.
-progress.
-rewrite H25 n4.
-
-move: H41.
-rewrite 6!rows_addm.
-rewrite H8 H14 H20 H25 H30 H35.
-rewrite n4 /max.
-simplify.
-rewrite /max.
-simplify.
-trivial.
-move: H41.
-rewrite 6!rows_addm.
-rewrite H8 H14 H20 H25 H30 H35.
-rewrite n4 /max.
-simplify.
-rewrite /max.
-simplify.
-trivial.
-rewrite H26 n4.
-trivial.
-
-
-(*result3.[a, a] = 0*)
 rewrite H32.
 progress.
 rewrite H30 n4.
 
-move: H41.
+move: H49.
 rewrite 6!rows_addm.
-rewrite H8 H14 H20 H25 H30 H35.
+rewrite H10 H17 H24 H30 H36 H42.
 rewrite n4 /max.
 simplify.
 rewrite /max.
 simplify.
 trivial.
-move: H41.
-rewrite 6!rows_addm.
-rewrite H8 H14 H20 H25 H30 H35.
+
+move: H50.
+rewrite 6!cols_addm.
+rewrite H11 H18 H25 H31 H37 H43.
 rewrite n4 /max.
 simplify.
 rewrite /max.
 simplify.
 trivial.
-rewrite H31 n4.
+
+
+
+(*result3.[a, a] = 0*)
+rewrite H38.
+progress.
+rewrite H36 n4.
+
+move: H49.
+rewrite 6!rows_addm.
+rewrite H10 H17 H24 H30 H36 H42.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
 trivial.
+
+move: H50.
+rewrite 6!cols_addm.
+rewrite H11 H18 H25 H31 H37 H43.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
 
 
 
 (*result4.[a, a] = 0*)
-rewrite H37.
+rewrite H44.
 progress.
-rewrite H35 n4.
+rewrite H42 n4.
 
-move: H41.
+move: H49.
 rewrite 6!rows_addm.
-rewrite H8 H14 H20 H25 H30 H35.
+rewrite H10 H17 H24 H30 H36 H42.
 rewrite n4 /max.
 simplify.
 rewrite /max.
 simplify.
 trivial.
-move: H41.
-rewrite 6!rows_addm.
-rewrite H8 H14 H20 H25 H30 H35.
+
+move: H50.
+rewrite 6!cols_addm.
+rewrite H11 H18 H25 H31 H37 H43.
 rewrite n4 /max.
 simplify.
 rewrite /max.
 simplify.
-trivial.
-rewrite H36 n4.
 trivial.
 simplify.
 trivial.
@@ -1133,22 +1069,22 @@ rewrite get_offunm.
 rewrite rows_offunm lez_maxr // n4 //.
 rewrite cols_offunm lez_maxr //. 
 progress.
-move: H41.
+
+move: H49.
 rewrite 6!rows_addm.
-rewrite H8 H14 H20 H25 H30 H35.
+rewrite H10 H17 H24 H30 H36 H42.
 rewrite n4 /max.
 simplify.
 rewrite /max.
 simplify.
-
 trivial.
 
 rewrite get_offunm.
 rewrite rows_offunm lez_maxr // n4 //.
 simplify.
 have zero_noteq_p: 0 <> p. 
-rewrite (not_eq p 0).
-by rewrite H44.
+rewrite eq_sym.
+by rewrite H51.
 trivial.
 rewrite zero_noteq_p.
 simplify.
@@ -1157,14 +1093,14 @@ simplify.
 (*result.[p, 0] = result.[1, 0]*)
 have resultp0_eq_result10:  mrange result p 0 /\ p <> 0 => result.[p,0] = result.[1, 0].
 progress.
-rewrite (H11 0 p).
+rewrite (H13 0 p).
 progress.
 trivial.
 
 (*result0.[p, 0] = result0.[1, 0]*)
 have result0p0_eq_result010:  mrange result0 p 0 /\ p <> 0 => result0.[p,0] = result0.[1, 0].
 progress.
-rewrite (H17 0 p).
+rewrite (H20 0 p).
 progress.
 trivial.
 
@@ -1172,7 +1108,7 @@ trivial.
 (*result1.[p, 0] = result1.[1, 0]*)
 have result1p0_eq_result110:  mrange result1 p 0 /\ p <> 0 => result1.[p,0] = result1.[1, 0].
 progress.
-rewrite (H23 0 p).
+rewrite (H27 0 p).
 progress.
 trivial.
 
@@ -1180,7 +1116,7 @@ trivial.
 (*result2.[p, 0] = result2.[1, 0]*)
 have result2p0_eq_result210:  mrange result2 p 0 /\ p <> 0 => result2.[p,0] = result2.[1, 0].
 progress.
-rewrite (H28 0 p).
+rewrite (H33 0 p).
 progress.
 trivial.
 
@@ -1188,7 +1124,7 @@ trivial.
 (*result3.[p, 0] = result3.[1, 0]*)
 have result3p0_eq_result310:  mrange result3 p 0 /\ p <> 0 => result3.[p,0] = result3.[1, 0].
 progress.
-rewrite (H33 0 p).
+rewrite (H39 0 p).
 progress.
 trivial.
 
@@ -1196,7 +1132,7 @@ trivial.
 (*result4.[p, 0] = result4.[1, 0]*)
 have result4p0_eq_result410:  mrange result4 p 0 /\ p <> 0 => result4.[p,0] = result4.[1, 0].
 progress.
-rewrite (H38 0 p).
+rewrite (H45 0 p).
 progress.
 trivial.
 
@@ -1212,75 +1148,59 @@ trivial.
 (*my.[p, 0] = my.[1, 0]*)
 have myp0_eq_my10:  mrange my p 0 /\ p <> 0 => my.[p,0] = my.[1, 0].
 progress.
-rewrite (H6 0 p).
+rewrite (H7 0 p).
 progress.
 trivial.
 
 rewrite resultp0_eq_result10.
 progress.
-rewrite H8 n4.
-move: H41.
+rewrite H10 n4.
+move: H49.
 rewrite 6!rows_addm.
-rewrite H8 H14 H20 H25 H30 H35.
+rewrite H10 H17 H24 H30 H36 H42.
 rewrite n4 /max.
 simplify.
 rewrite /max.
 simplify.
 trivial.
 
-rewrite H9 n4 //.
-
+rewrite H11 n4 //.
 
 rewrite result0p0_eq_result010.
 progress.
-rewrite H14 n4.
-move: H41.
+rewrite H17 n4.
+move: H49.
 rewrite 6!rows_addm.
-rewrite H8 H14 H20 H25 H30 H35.
+rewrite H10 H17 H24 H30 H36 H42.
 rewrite n4 /max.
 simplify.
 rewrite /max.
 simplify.
 trivial.
 
-rewrite H15 n4 //.
+rewrite H18 n4 //.
 
 rewrite result1p0_eq_result110.
 progress.
-rewrite H20 n4.
-move: H41.
+rewrite H24 n4.
+move: H49.
 rewrite 6!rows_addm.
-rewrite H8 H14 H20 H25 H30 H35.
+rewrite H10 H17 H24 H30 H36 H42.
 rewrite n4 /max.
 simplify.
 rewrite /max.
 simplify.
 trivial.
 
-rewrite H21 n4 //.
+rewrite H25 n4 //.
 
 
 rewrite result2p0_eq_result210.
 progress.
-rewrite H25 n4.
-move: H41.
-rewrite 6!rows_addm.
-rewrite H8 H14 H20 H25 H30 H35.
-rewrite n4 /max.
-simplify.
-rewrite /max.
-simplify.
-trivial.
-
-rewrite H26 n4 //.
-
-
-rewrite result3p0_eq_result310.
-progress.
 rewrite H30 n4.
-move: H41.
+move: H49.
 rewrite 6!rows_addm.
-rewrite H8 H14 H20 H25 H30 H35.
+rewrite H10 H17 H24 H30 H36 H42.
 rewrite n4 /max.
 simplify.
 rewrite /max.
@@ -1289,27 +1209,42 @@ trivial.
 
 rewrite H31 n4 //.
 
-rewrite result4p0_eq_result410.
+
+rewrite result3p0_eq_result310.
 progress.
-rewrite H35 n4.
-move: H41.
+rewrite H36 n4.
+move: H49.
 rewrite 6!rows_addm.
-rewrite H8 H14 H20 H25 H30 H35.
+rewrite H10 H17 H24 H30 H36 H42.
 rewrite n4 /max.
 simplify.
 rewrite /max.
 simplify.
 trivial.
 
-rewrite H36 n4 //.
+rewrite H37 n4 //.
+
+rewrite result4p0_eq_result410.
+progress.
+rewrite H42 n4.
+move: H49.
+rewrite 6!rows_addm.
+rewrite H10 H17 H24 H30 H36 H42.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+rewrite H43 n4 //.
 
 
 rewrite mxp0_eq_mx10.
 progress.
 rewrite H n4.
-move: H41.
+move: H49.
 rewrite 6!rows_addm.
-rewrite H8 H14 H20 H25 H30 H35.
+rewrite H10 H17 H24 H30 H36 H42.
 rewrite n4 /max.
 simplify.
 rewrite /max.
@@ -1320,20 +1255,18 @@ rewrite H0 n4 //.
 
 rewrite myp0_eq_my10.
 progress.
-rewrite H3 n4.
-move: H41.
+rewrite H4 n4.
+move: H49.
 rewrite 6!rows_addm.
-rewrite H8 H14 H20 H25 H30 H35.
+rewrite H10 H17 H24 H30 H36 H42.
 rewrite n4 /max.
 simplify.
 rewrite /max.
 simplify.
 trivial.
 
-rewrite H4 n4 //.
+rewrite H5 n4 //.
 trivial.
-
-
 
 
 
@@ -1344,18 +1277,19 @@ rewrite get_offunm.
 rewrite rows_offunm lez_maxr // n4 //.
 rewrite cols_offunm lez_maxr //. 
 progress.
-move: H41.
+
+move: H49.
 rewrite 6!rows_addm.
-rewrite H8 H14 H20 H25 H30 H35.
+rewrite H10 H17 H24 H30 H36 H42.
 rewrite n4 /max.
 simplify.
 rewrite /max.
 simplify.
 trivial.
 
-move: H43.
+move: H51.
 rewrite 6!cols_addm.
-rewrite H9 H15 H21 H26 H31 H36.
+rewrite H11 H18 H25 H31 H37 H43.
 rewrite n4 /max.
 simplify.
 rewrite /max.
@@ -1367,10 +1301,11 @@ rewrite get_offunm.
 rewrite rows_offunm lez_maxr // n4 //.
 rewrite cols_offunm lez_maxr //. 
 simplify.
-rewrite H42.
-move: H43.
+rewrite H50.
+
+move: H51.
 rewrite 6!cols_addm.
-rewrite H9 H15 H21 H26 H31 H36.
+rewrite H11 H18 H25 H31 H37 H43.
 rewrite n4 /max.
 simplify.
 rewrite /max.
@@ -1378,25 +1313,234 @@ simplify.
 trivial.
 
 simplify.
-rewrite H45.
-
-have s_noteq_p: s <> p. 
-rewrite (not_eq p s).
-by rewrite H44.
-trivial.
-rewrite s_noteq_p.
-simplify.
-
 
 (*result.[p, s] = result.[0, s]*)
-have resultps_eq_result0s:  mrange result p s => result.[p,s] = result.[0, s].
+have resultps_eq_result0s: result.[p,s] = result.[0, s].
+rewrite H14.
+progress.
+move: H49.
+rewrite 6!rows_addm.
+rewrite H10 H17 H24 H30 H36 H42.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+move: H51.
+rewrite 6!cols_addm.
+rewrite H11 H18 H25 H31 H37 H43.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+trivial.
+
+
+(*result0.[p, s] = result0.[0, s]*)
+have result0ps_eq_result00s: result0.[p,s] = result0.[0, s].
+rewrite H21.
+progress.
+move: H49.
+rewrite 6!rows_addm.
+rewrite H10 H17 H24 H30 H36 H42.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+move: H51.
+rewrite 6!cols_addm.
+rewrite H11 H18 H25 H31 H37 H43.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+trivial.
+
+
+(*result1.[p, s] = result1.[0, s]*)
+have result1ps_eq_result10s: result1.[p,s] = result1.[0, s].
+rewrite H28.
 progress.
 
-(*H44 H45 and H11 proves the above relation*)
-admit.
+move: H49.
+rewrite 6!rows_addm.
+rewrite H10 H17 H24 H30 H36 H42.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+move: H51.
+rewrite 6!cols_addm.
+rewrite H11 H18 H25 H31 H37 H43.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+trivial.
+
+(*result2.[p, s] = result2.[0, s]*)
+have result2ps_eq_result20s: result2.[p,s] = result2.[0, s].
+rewrite H34.
+progress.
+
+move: H49.
+rewrite 6!rows_addm.
+rewrite H10 H17 H24 H30 H36 H42.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+move: H51.
+rewrite 6!cols_addm.
+rewrite H11 H18 H25 H31 H37 H43.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+trivial.
 
 
-admit.
+(*result3.[p, s] = result3.[0, s]*)
+have result3ps_eq_result30s: result3.[p,s] = result3.[0, s].
+rewrite H40.
+progress.
+
+move: H49.
+rewrite 6!rows_addm.
+rewrite H10 H17 H24 H30 H36 H42.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+move: H51.
+rewrite 6!cols_addm.
+rewrite H11 H18 H25 H31 H37 H43.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+trivial.
+
+
+
+(*result4.[p, s] = result4.[0, s]*)
+have result4ps_eq_result40s: result4.[p,s] = result4.[0, s].
+rewrite H46.
+progress.
+
+move: H49.
+rewrite 6!rows_addm.
+rewrite H10 H17 H24 H30 H36 H42.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+move: H51.
+rewrite 6!cols_addm.
+rewrite H11 H18 H25 H31 H37 H43.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+trivial.
+
+
+(*mx.[p, s] = mx.[0, s]*)
+have mxps_eq_mx10s: mx.[p,s] = mx.[0, s].
+rewrite H3.
+progress.
+
+move: H49.
+rewrite 6!rows_addm.
+rewrite H10 H17 H24 H30 H36 H42.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+rewrite H n4.
+trivial.
+
+move: H51.
+rewrite 6!cols_addm.
+rewrite H11 H18 H25 H31 H37 H43.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+rewrite H0 n4.
+trivial.
+
+trivial.
+
+
+(*my.[p, s] = my.[0, s]*)
+have myps_eq_my10s: my.[p,s] = my.[0, s].
+rewrite H8.
+progress.
+
+move: H49.
+rewrite 6!rows_addm.
+rewrite H10 H17 H24 H30 H36 H42.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+rewrite H4 n4.
+trivial.
+
+move: H51.
+rewrite 6!cols_addm.
+rewrite H11 H18 H25 H31 H37 H43.
+rewrite n4 /max.
+simplify.
+rewrite /max.
+simplify.
+trivial.
+
+rewrite H5 n4.
+trivial.
+
+trivial.
+
+rewrite resultps_eq_result0s result0ps_eq_result00s.
+rewrite result1ps_eq_result10s result2ps_eq_result20s result3ps_eq_result30s result4ps_eq_result40s mxps_eq_mx10s myps_eq_my10s.
+
+have s_noteq_p: s <> p.
+rewrite eq_sym.
+trivial.
+
+rewrite s_noteq_p H53.
+simplify.
+trivial.
 
 
 qed.

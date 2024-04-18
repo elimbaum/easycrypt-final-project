@@ -107,6 +107,18 @@ module Sim = {
     return offunm ((fun p_ s =>
         if p_ = s then 0 else (nth err shares s)), N, N);
   }
+
+  proc add(x y : int, i j : party) : matrix = {
+    var mx, my : matrix;
+    var rx, ry : int;
+
+    rx <$ randint;
+    ry <$ randint;
+
+    mx <@ share(rx, i);
+    my <@ share(ry, j);
+    return mx + my;
+  }
 }.
 
 module F4 = {
@@ -217,14 +229,14 @@ module F4 = {
   }
 
 
-  proc add_main(x y : int) : matrix = {
+  proc add_main(x y : int, i j : party) : matrix = {
     var mx, my, mz : matrix;
     var z : int;
 
-    (* party 0 has x *)
-    mx <@ share(x, 0);
-    (* party 1 has y *)
-    my <@ share(y, 1);
+    (* party i has x *)
+    mx <@ share(x, i);
+    (* party j has y *)
+    my <@ share(y, j);
 
     (* addition is local *)
     mz <- mx + my;
@@ -346,38 +358,58 @@ simplify.
 rewrite (sum_four shares{hr}) // /#.
 qed.
 
-(* Prove the sharing scheme is secure. *)
-(* for any party, view of real and simulated matrices look the same *)
-lemma share_secure(p_ : party) :
+(* Prove the sharing scheme is secure.
+   Party ps shares data. For any other party pv, view of real and simulated matrices look
+   the same.
+ *)
+lemma share_secure(ps, pv : party) :
     equiv[F4.share ~ Sim.share :
-      ={p} /\ p{1} = p_ /\ 0 <= p_ < N
+      ={p} /\ p{1} = ps /\ 0 <= ps < N
       ==>
-      view res{1} p_ = view res{2} p_].
+      0 <= pv < N /\ pv <> ps => view res{1} pv = view res{2} pv].
 proof.
 proc.
 (* si are all random *)
-seq 5 5 : (={p} /\ p{1} = p_ /\
+seq 4 4 : false.
+rnd (fun u => x{1} - u).
+rnd (fun u => x{1} - u).
+rnd (fun u => x{1} - u).
+rnd (fun u => x{1} - u).
+auto.
+progress.
+smt().
+smt(randint1E randint_full).
+smt().
+smt(randint1E randint_full).
+smt().
+smt(randint1E randint_full).
+smt().
+smt(randint1E randint_full).
+admit.
+admit.
+(*seq 5 5 : (={p} /\ p{1} = ps /\ 0 <= ps < N /\
   s0{1} \in randint /\ ={s0} /\
   s1{1} \in randint /\ ={s1} /\
   s2{1} \in randint /\ ={s2} /\
   s3{1} \in randint /\ ={s3} /\
-  0 <= p_ < N /\
-  size shares{2} = 4 /\ ={shares}
+  shares{1} = [s0{1}; s1{1}; s2{1}; s3{1}] /\
+  size shares{1} = 4 /\ ={shares}
 ).
 auto.
-progress.
 auto.
 progress.
-rewrite _4p in H4.
+rewrite _4p in H0.
+rewrite _4p in H6.
 (* rewrite matrices *)
 rewrite put_in.
-by rewrite size_put H5.
+by rewrite size_put H H0.
 (* convert view of matrix to vector *)
 rewrite /view /row.
 rewrite 2!cols_offunm _4p lez_maxr //.
 rewrite eq_vectorP.
 rewrite 2!size_offunv lez_maxr // /=.
-move => i i_bounded.
+move => sh. 
+elim => shgt0 shlt4.
 rewrite get_offunv // get_offunv //.
 (* evaluate function calls *)
 simplify.
@@ -387,83 +419,78 @@ rewrite rows_offunm lez_maxr // cols_offunm lez_maxr //.
 rewrite get_offunm.
 rewrite rows_offunm lez_maxr // cols_offunm lez_maxr //.
 progress.
-(* trivial when p = i => diagonal, so zero *)
-case (p{2} = i) => [// | off_diag].
+(* trivial when pv = sh => view on diagonal, so zero *)
+case (pv = sh) => [// | off_diag].
 (* off diagonal: shares are indistinguishable *)
 rewrite nth_cat.
 rewrite size_take //.
 rewrite size_put.
-rewrite H5 H4 /=.
-(* one side of diagonal *)
-case (p{2} < i) => [plti | pgteqi].
-have inltp : !(i < p{2}).
-  smt().
-rewrite inltp /=.
+have size4 : size [s0{2}; s1{2}; s2{2}; s3{2}] = 4.
+smt().
+rewrite size4 H0 /=.
+(* bottom-left side of diagonal *)
+case (sh < p{2}) => [shltp | shgteqp].
+rewrite nth_take.
+smt().
+smt().
+rewrite nth_put.
+by rewrite H H0.
+have pneqi : p{2} <> sh by smt().
+smt().
+(* share number = (party who shared) number 
+   note: we set it up so that sharing party keeps all random shares,
+   and gives (x - sum...) to all others
+
+   so this is actually the interesting part *)
+case (sh = p{2}) => [sheqp | shneqp].
+rewrite sheqp /=.
+(* actually interesting part *)
+
+
+(* top-right side of diagonal *)
+have pltsh : (p{2} < sh).
+smt().
+have shpneq0 : sh - p{2} <> 0.
+smt().
+rewrite shpneq0 /=.
 rewrite nth_drop.
 smt().
 smt().
-have ip2n0 : i - p{2} <> 0.
-  smt().
-rewrite ip2n0 /=.
 rewrite nth_put.
-by rewrite H5 H3 H4.
-have simp_mat_add : i = p{2} + 1 + (i - p{2} - 1)%Mat_A.ZR.
+smt().
+have simp_mat_add : sh = p{2} + 1 + (sh - p{2} - 1)%Mat_A.ZR.
   smt(addrA addrC).
-by rewrite -simp_mat_add off_diag /=.
-(* other side of diagonal *)
-have iltp : i < p{2}.
-  smt().
-rewrite iltp /=.
-rewrite nth_take.
-rewrite H3.
-rewrite iltp.
-rewrite nth_put.
-rewrite H3 H5 H4 //.
-rewrite off_diag //.
+rewrite -simp_mat_add /=.
+smt().
+*)
 qed.
 
-(* need lemma valid shares *)
 
 (* Prove addition is correct *)
-(* TODO: don't open inside proc. use valid. *)
-lemma add_correct(x_ y_ : int) :
-    hoare[F4.add_main : x = x_ /\ y = y_ ==> valid res /\ open res = x_ + y_].
+lemma add_correct(x_ y_ : int, pi pj : party) :
+    hoare[F4.add_main : x = x_ /\ y = y_ /\ i = pi /\ j = pj /\ 0 <= pi < N /\ 0 <= pj < N
+      ==> valid res /\ open res = x_ + y_].
 proof.
 proc.
 have n4 : N = 4 by rewrite _4p.
-seq 1 : (open mx = x_ /\ y = y_ /\ rows mx = Top.N /\ cols mx = Top.N /\
-        (forall (a : int), mrange mx a a => mx.[a, a] = 0) /\
-         (forall s, forall p, mrange mx p s /\ p <> s /\ s = 0 => 
-          (if s = 0 then mx.[p, s] = mx.[1, s]
-           else mx.[p, s] = mx.[0, s])) /\ 
-      (forall s, forall p, mrange mx p s /\ p <> s /\ s <> 0=> 
-         (if s = 0 then mx.[p, s] = mx.[1, s]
-          else mx.[p, s] = mx.[0, s]))).
+
+seq 1 : (open mx = x_ /\ y = y_ /\ size mx = (N, N) /\ valid mx /\ j{hr} = pj /\ 0 <= pj < N).
+
 auto.
-call (share_correct x_ 0).
+call (share_correct x_ pi).
 auto => />; progress; smt().
-seq 1 : (open mx = x_ /\ rows mx = Top.N /\ cols mx = Top.N /\ 
-        (forall (a : int), mrange mx a a => mx.[a, a] = 0) /\
-         (forall s, forall p, mrange mx p s /\ p <> s /\ s = 0=> 
-         (if s = 0 then mx.[p, s] = mx.[1, s]
-          else mx.[p, s] = mx.[0, s])) /\
-        (forall s, forall p, mrange mx p s /\ p <> s /\ s <> 0=> 
-         (if s = 0 then mx.[p, s] = mx.[1, s]
-          else mx.[p, s] = mx.[0, s])) /\
-         open my = y_ /\ rows my = Top.N /\ cols my = Top.N /\ 
-        (forall (a : int), mrange my a a => my.[a, a] = 0) /\
-        (forall s, forall p, mrange my p s /\ p <> s /\ s = 0 => 
-          (if s = 0 then my.[p, s] = my.[1, s]
-           else my.[p, s] = my.[0, s])) /\
-        (forall s, forall p, mrange my p s /\ p <> s /\ s <> 0=> 
-         (if s = 0 then my.[p, s] = my.[1, s]
-          else my.[p, s] = my.[0, s]))).
-call (share_correct y_ 1).
+
+seq 1 : (open mx = x_ /\ size mx = (N, N) /\ valid mx /\
+         open my = y_ /\ size my = (N, N) /\ valid my).
+call (share_correct y_ pj).
 (*Validity proof*)
 auto => />; progress; smt().
 wp.
+auto.
+
+(*Validity proof*)
 auto => />.
-move => &hr rows_mx cols_mx diag_mx not_diag_mx_left not_diag_mx_right rows_my cols_my diag_my not_diag_my_left not_diag_my_right.
+move => &hr rows_mx cols_mx _ _ diag_mx not_diag_mx_left not_diag_mx_right rows_my cols_my _ _ diag_my not_diag_my_left not_diag_my_right.
 progress.
 rewrite rows_addm rows_mx rows_my /#.
 rewrite cols_addm cols_mx cols_my /#.
@@ -504,8 +531,56 @@ smt().
 by rewrite open_linear.
 qed.
 
+lemma add_secure(pi pj : party) :
+    equiv[F4.add_main ~ Sim.add :
+      0 <= pi < N /\ 0 <= pi < N
+      ==>
+      view res{1} pi = view res{2} pi \/ view res{1} pj = view res{2} pj].
+proof.
+proc.
+wp.
+seq 0 2 : (0 <= pi < N /\ 0 <= pj < N).
+auto.
+progress.
+rewrite randint_ll.
+(*
+call (share_secure p1).
+call (share_secure p2).
+auto.
+progress.
+
+rewrite /view.
+rewrite 2!rowD.
+rewrite /view in H4.
+rewrite /view in H6.
+rewrite H6.
+seq 2 0 : true.
+call{1} (_ : true ==> true).
+proc.
+auto.
+progress.
+smt(randint_ll).
+call{1} (_ : true ==> true).
+proc.
+auto.
+progress.
+smt(randint_ll).
+auto.
+call{2} (_ : true ==> true).
+proc.
+auto.
+progress.
+smt(randint_ll).
+auto.
+progress.
+*)
+admit.
+admit.
+admit.
+qed.
+
 (* TODO: maybe do something like this to simplify all of the get/rows/cols proof steps below *)
-lemma offunm_unwrap (i, j : party, f : party -> party -> int):
+lemma offunm_unwrap (i, j : party, f : party -> int -> int):
     0 <= i < N /\ 0 <= j < N => (offunm (fun(x y) => f x y, N, N)).[i, j] = f i j.
 proof.
 progress.
@@ -538,6 +613,7 @@ rewrite rows_offunm cols_offunm /= lez_maxr //.
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm /= lez_maxr //.
 by rewrite /= H5 /=.
+
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm /= lez_maxr //.
 rewrite get_offunm.
@@ -555,12 +631,6 @@ rewrite get_offunm.
 by rewrite rows_offunm cols_offunm => /=.
 simplify.
 smt(_4p sum_four).
-qed.
-
-(*There must be an existing lemma but I am just proving it for now*)
-lemma not_eq(x, y : int): x <> y => y <> x.
-proof.
-smt().
 qed.
 
 (* Prove correctness of inp. *)
@@ -643,7 +713,7 @@ move: H0.
 rewrite rows_addm rowsn rows_offunm /#.
 move: H2.
 rewrite cols_offunm colsn cols_offunm /#.
-have s_noteq_p: s <> p by smt(not_eq).
+have s_noteq_p: s <> p by smt().
 rewrite H4 s_noteq_p /#.
 (* begin correctness proof *)
 rewrite open_linear.
@@ -719,7 +789,7 @@ call (inp_correct (mx.[0,3]*my.[1,0] + mx.[1,0]*my.[0,3]) 1 2 0 3).
 call (inp_correct (mx.[0,2]*my.[1,0] + mx.[1,0]*my.[0,2]) 1 3 0 2).
 call (inp_correct (mx.[0,1]*my.[1,0] + mx.[1,0]*my.[0,1]) 2 3 0 1).
 
-auto => />.
+auto.
 progress.
 
 by rewrite n4.
@@ -957,7 +1027,7 @@ rewrite get_offunm.
 rewrite rows_offunm lez_maxr // n4 //.
 simplify.
 have zero_noteq_p: 0 <> p. 
-rewrite (not_eq p 0).
+rewrite eq_sym.
 by rewrite H51.
 trivial.
 rewrite zero_noteq_p.

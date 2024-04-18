@@ -216,7 +216,7 @@ module F4 = {
   }
 
 
-  proc add_main(x y : int) : int = {
+  proc add_main(x y : int) : matrix = {
     var mx, my, mz : matrix;
     var z : int;
 
@@ -228,8 +228,7 @@ module F4 = {
     (* addition is local *)
     mz <- mx + my;
 
-    z <- open(mz);
-    return z;
+    return mz;
   }
 }.
 
@@ -427,20 +426,71 @@ qed.
 (* Prove addition is correct *)
 (* TODO: don't open inside proc. use valid. *)
 lemma add_correct(x_ y_ : int) :
-    hoare[F4.add_main : x = x_ /\ y = y_ ==> res = x_ + y_].
+    hoare[F4.add_main : x = x_ /\ y = y_ ==> valid res /\ open res = x_ + y_].
 proof.
 proc.
 have n4 : N = 4 by rewrite _4p.
-seq 1 : (open mx = x_ /\ y = y_).
+seq 1 : (open mx = x_ /\ y = y_ /\ rows mx = Top.N /\ cols mx = Top.N /\
+        (forall (a : int), mrange mx a a => mx.[a, a] = 0) /\
+         forall s, forall p, mrange mx p s /\ p <> s => 
+          (if s = 0 then mx.[p, s] = mx.[1, s]
+           else mx.[p, s] = mx.[0, s])).
 auto.
 call (share_correct x_ 0).
-auto; smt().
-seq 1 : (open my = y_ /\ open mx = x_).
+auto => />; progress; smt().
+seq 1 : (open mx = x_ /\ rows mx = Top.N /\ cols mx = Top.N /\ 
+        (forall (a : int), mrange mx a a => mx.[a, a] = 0) /\
+         (forall s, forall p, mrange mx p s /\ p <> s => 
+         (if s = 0 then mx.[p, s] = mx.[1, s]
+          else mx.[p, s] = mx.[0, s])) /\         
+         open my = y_ /\ rows my = Top.N /\ cols my = Top.N /\ 
+        (forall (a : int), mrange my a a => my.[a, a] = 0) /\
+        (forall s, forall p, mrange my p s /\ p <> s => 
+          (if s = 0 then my.[p, s] = my.[1, s]
+           else my.[p, s] = my.[0, s]))).
 call (share_correct y_ 1).
-auto; progress.
-smt().
-auto.
+(*Validity proof*)
+auto => />; progress; smt().
+wp.
+auto => />.
+move => &hr rows_mx cols_mx diag_mx not_diag_mx rows_my cols_my diag_my not_diag_my.
 progress.
+rewrite rows_addm rows_mx rows_my /#.
+rewrite cols_addm cols_mx cols_my /#.
+rewrite get_addm; smt().
+rewrite 2!get_addm.
+have mxp0_eq_mx10: mrange mx{hr} p 0 /\ p <> 0 => mx{hr}.[p,0] = mx{hr}.[1, 0] by smt().
+rewrite mxp0_eq_mx10.
+rewrite H.
+rewrite rows_addm in H0.
+smt().
+have myp0_eq_my10: mrange my{hr} p 0 /\ p <> 0 => my{hr}.[p,0] = my{hr}.[1, 0] by smt().
+rewrite myp0_eq_my10.
+rewrite H.
+rewrite rows_addm in H0.
+smt().
+smt().
+rewrite 2!get_addm.
+have mxps_eq_mx0s: mrange mx{hr} p s /\ p <> s /\ s <> 0 => mx{hr}.[p,s] = mx{hr}.[0, s].
+progress.
+by smt().
+rewrite mxps_eq_mx0s.
+progress.
+rewrite rows_addm in H0.
+smt().
+rewrite cols_addm in H2.
+smt().
+have myps_eq_my0s: mrange my{hr} p s /\ p <> s /\ s <> 0 => my{hr}.[p,s] = my{hr}.[0, s]. 
+progress.
+by smt().
+rewrite  myps_eq_my0s.
+progress.
+rewrite rows_addm in H0.
+smt().
+rewrite cols_addm in H2.
+smt().
+smt().
+(*Corretness proof*)
 by rewrite open_linear.
 qed.
 
@@ -497,6 +547,12 @@ simplify.
 smt(_4p sum_four).
 qed.
 
+(*There must be an existing lemma but I am just proving it for now*)
+lemma not_eq(x, y : int): x <> y => y <> x.
+proof.
+smt().
+qed.
+
 (* Prove correctness of inp. *)
 lemma inp_correct(x_ : int, i_ j_ g_ h_: party) :
     hoare[F4.inp : x = x_ /\ i = i_ /\
@@ -534,40 +590,50 @@ by rewrite diag0.
 rewrite 2!get_addm.
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm.
-have plt4 : p < 4.
-  move : H0.
-  rewrite rows_addm rowsn rows_offunm //.
-trivial.
-rewrite get_offunm.
-by rewrite rows_offunm cols_offunm.
+rewrite /max.
 simplify.
-have zneqp : 0 <> p by smt().
-rewrite zneqp /=.
-have plt4 : p < 4.
-  move : H0.
-  rewrite rows_addm rowsn rows_offunm //.
-rewrite (valid 0).
-rewrite rowsn colsn //.
-by simplify.
-have plt4 : p < 4.
-  move : H0.
-  rewrite rows_addm rowsn rows_offunm //.
-have slt4 : s < 4.
-  move : H2.
-  rewrite cols_addm colsn cols_offunm //.
+move: H0.
+rewrite rows_addm rowsn rows_offunm /#.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm /#.
+simplify.
+have resultp0_eq_result10: mrange result p 0 /\ p <> 0 => result.[p, 0] = result.[1, 0] by smt().
+rewrite resultp0_eq_result10.
+progress.
+move: H0.
+rewrite rows_addm rowsn rows_offunm /#.
+move: H2.
+rewrite cols_addm colsn cols_offunm /#.
+smt().
 rewrite 2!get_addm.
 rewrite get_offunm.
-rewrite rows_offunm cols_offunm //.
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm //.
+rewrite rows_offunm cols_offunm.
+rewrite /max.
 simplify.
-have sneqp : s <> p by smt().
-rewrite sneqp H4 /=.
-have rpeq0 : result.[p, s] = result.[0, s].
-(* why can't we prove this from `valid` ??? *)
-admit.
-rewrite rpeq0.
-trivial.
+progress.
+move: H0.
+rewrite rows_addm rowsn rows_offunm /#.
+move: H2.
+rewrite cols_offunm colsn cols_offunm /#.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm.
+rewrite /max.
+simplify.
+progress.
+move: H2.
+rewrite cols_offunm colsn cols_offunm /#.
+simplify.
+have resultps_eq_result0s: mrange result p s /\ p <> s /\ s <> 0 => result.[p, s] = result.[0, s].
+progress.
+smt().
+rewrite resultps_eq_result0s.
+progress.
+move: H0.
+rewrite rows_addm rowsn rows_offunm /#.
+move: H2.
+rewrite cols_offunm colsn cols_offunm /#.
+have s_noteq_p: s <> p by smt(not_eq).
+rewrite H4 s_noteq_p /#.
 (* begin correctness proof *)
 rewrite open_linear.
 rewrite /open.

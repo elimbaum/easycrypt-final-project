@@ -273,8 +273,8 @@ smt().
 qed.
 
 (* replacing zero value in list with `x` increases the sum by `x` *)
-lemma sum_replacement(shares : int list, i x : int) :
-    0 <= i < size shares /\ size shares = N /\ nth err shares i = 0  => sumz (put shares i x) = x + sumz shares.
+lemma sum_replacement(shares : int list, i x y : int) :
+    0 <= i < size shares /\ size shares = N /\ nth err shares i = y  => sumz (put shares i x) = x - y + sumz shares.
 proof.
 progress.
 rewrite _4p in H1.
@@ -317,7 +317,7 @@ seq 1 : (sumz shares = x_
 auto.
 progress.
 (* sum = x *)
-rewrite (sum_replacement shares{hr} p{hr} (x{hr} - sumz shares{hr})).
+rewrite (sum_replacement shares{hr} p{hr} (x{hr} - sumz shares{hr}) 0).
 by rewrite H0 H2 H H1 /= // _enz.
 smt().
 rewrite size_put //.
@@ -361,30 +361,15 @@ qed.
    Party ps shares data. For any other party pv, view of real and simulated matrices look
    the same.
  *)
-lemma share_secure(ps, pv : party) :
-    equiv[F4.share ~ Sim.share :
-      ={p} /\ p{1} = ps /\ 0 <= ps < N
+lemma share_secure(x_ y_ : int, ps, pv : party) :
+    equiv[F4.share ~ F4.share :
+      x{1} = x_ /\ x{2} = y_ /\ ={p} /\ p{1} = ps /\ 0 <= ps < N
       ==>
-      0 <= pv < N /\ pv <> ps => view res{1} pv = view res{2} pv].
+      0 <= pv < N /\ pv <> ps => (*open res{1} = x_ /\ valid res{1} /\ valid res{2} /\*)
+      view res{1} pv = view res{2} pv].
 proof.
 proc.
 (* si are all random *)
-seq 4 4 : false.
-rnd (fun u => x{1} - u).
-rnd (fun u => x{1} - u).
-rnd (fun u => x{1} - u).
-rnd (fun u => x{1} - u).
-auto.
-progress.
-smt().
-smt(randint1E randint_full).
-smt().
-smt(randint1E randint_full).
-smt().
-smt(randint1E randint_full).
-smt().
-smt(randint1E randint_full).
-
 seq 5 5 : (={p} /\ p{1} = ps /\ 0 <= ps < N /\
   s0{1} \in randint /\ ={s0} /\
   s1{1} \in randint /\ ={s1} /\
@@ -400,8 +385,9 @@ rewrite _4p in H0.
 rewrite _4p in H6.
 (* rewrite matrices *)
 rewrite put_in.
-by rewrite size_put H H0.
+(* by rewrite size_put H H5 H0. *)
 (* convert view of matrix to vector *)
+rewrite size_put H H0 //.
 rewrite /view /row.
 rewrite 2!cols_offunm _4p lez_maxr //.
 rewrite eq_vectorP.
@@ -423,18 +409,72 @@ case (pv = sh) => [// | off_diag].
 rewrite nth_cat.
 rewrite size_take //.
 rewrite size_put.
-have size4 : size [s0{2}; s1{2}; s2{2}; s3{2}] = 4.
-smt().
+have size4 : size [s0{2}; s1{2}; s2{2}; s3{2}] = 4 by trivial.
 rewrite size4 H0 /=.
-(* bottom-left side of diagonal *)
+(* bottom-left side of diagonal: pv is looking at a truly random element *)
 case (sh < p{2}) => [shltp | shgteqp].
 rewrite nth_take.
-smt().
-smt().
+rewrite H.
+rewrite shltp.
 rewrite nth_put.
-by rewrite H H0.
+by rewrite H size4.
 have pneqi : p{2} <> sh by smt().
+rewrite pneqi /=.
+rewrite nth_put.
+rewrite size_put size4 //.
+rewrite pneqi /=.
+rewrite nth_put //.
+by rewrite pneqi /=.
+(* top right diagonal: pv still looking at a truly random element *)
+case (p{2} < sh) => [shgtp | sheqp].
+rewrite sum_four.
+rewrite size_put size4 //.
+rewrite nth_put // nth_put // nth_put // nth_put //.
+simplify.
+rewrite nth_drop.
 smt().
+smt().
+have shpneq0 : sh - p{2} <> 0.
+smt().
+rewrite shpneq0 /=.
+have simp_mat_add : sh = p{2} + 1 + (sh - p{2} - 1)%Mat_A.ZR.
+  smt(addrA addrC).
+rewrite -simp_mat_add /=.
+rewrite nth_put //.
+rewrite nth_put.
+rewrite size_put //.
+
+(* on diag - pv is looking at a nonrandom share, x - sum(others) *)
+have shmp : sh - p{2} = 0.
+smt().
+rewrite shmp /=.
+have peqsh2 : p{2} = sh by smt().
+rewrite peqsh2.
+
+(* messy for now... party by party *)
+case (sh = 0) => [sh0 | _].
+rewrite sh0.
+rewrite sum_four.
+rewrite size_put.
+smt().
+rewrite nth_put // nth_put // nth_put // nth_put //.
+simplify.
+have lhsrand : x{1} - (s1{2} + s2{2} + s3{2}) \in randint.
+
+rewrite randint_full.
+
+have uni : is_uniform randint.
+admit.
+rewrite /is_uniform in uni.
+have : mu1 randint (x{1} - (s1{2} + s2{2} + s3{2})) = mu1 randint s0{2}.
+smt().
+
+simplify.
+rewrite is_uniform.
+rewrite supportP in H1.
+rewrite supportP in 
+smt().
+
 (* share number = (party who shared) number 
    note: we set it up so that sharing party keeps all random shares,
    and gives (x - sum...) to all others
@@ -443,8 +483,26 @@ smt().
 case (sh = p{2}) => [sheqp | shneqp].
 rewrite sheqp /=.
 (* actually interesting part *)
+rewrite sum_four.
+rewrite size_put size4 //.
+rewrite nth_put //.
+rewrite nth_put //.
+rewrite nth_put //.
+rewrite nth_put //.
+simplify.
 
+have sumsh : s0{1} + s1{1} + s2{1} + s3{1} = x{1}.
 
+case (p{2} = 0) => p0.
+rewrite p0.
+simplify.
+smt().
+case (p{2} = 1) => p1.
+rewrite p1 /= /#.
+case (p{2} = 2) => p2.
+rewrite p2 /= /#.
+have p3 : p{2} = 3 by smt().
+rewrite p3 /= /#.
 (* top-right side of diagonal *)
 have pltsh : (p{2} < sh).
 smt().

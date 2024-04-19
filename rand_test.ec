@@ -49,14 +49,13 @@ proof.
 proc.
 (* consume the first random assignment *)
 rnd{1}.
-(* rnd rnd_f rnd_g. *)
-rnd (fun u => u + b{1}) (fun u => u - b{1}).
+rnd rnd_f rnd_g.
 auto.
 progress.
-smt().
+by rewrite fg_inv.
 smt(randint1E).
 rewrite randint_full.
-smt().
+by rewrite gf_inv.
 rewrite randint_ll.
 (* ???? *)
 admit.

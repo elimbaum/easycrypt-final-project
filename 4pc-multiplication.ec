@@ -358,12 +358,20 @@ simplify.
 rewrite (sum_four shares{hr}) // /#.
 qed.
 
+(* want to argue: if both uniformly random, indistinguishable. this is not that. *)
+lemma uniform_equiv (x y) :
+    x \in randint /\ y \in randint => x = y.
+proof.
+rewrite 2!randint_full /=.
+admit.
+qed.
+
 (* Prove the sharing scheme is secure.
    Party ps shares data. For any other party pv, view of real and simulated matrices look
    the same.
  *)
 lemma share_secure(ps, pv : party) :
-    equiv[F4.share ~ F4.share :
+    equiv[F4.share ~ Sim.share :
       ={p} /\ p{1} = ps /\ 0 <= ps < N
       ==>
       0 <= pv < N /\ pv <> ps => 
@@ -379,6 +387,36 @@ seq 5 5 : (={p} /\ p{1} = ps /\ 0 <= ps < N /\
   shares{1} = [s0{1}; s1{1}; s2{1}; s3{1}] /\
   size shares{1} = 4 /\ ={shares}
 ).
+(*
+wp.
+rnd (fun u => (x{1} - (s0{1} + s1{1} + s2{1}        )) - u).
+rnd (fun u => (x{1} - (s0{1} + s1{1} +         s3{1})) - u).
+rnd (fun u => (x{1} - (s0{1} +         s2{1} + s3{1})) - u).
+rnd (fun u => (x{1} - (        s1{1} + s2{1} + s3{1})) - u).
+auto.
+progress.
+smt().
+smt(randint1E).
+smt().
+smt(randint1E).
+smt().
+smt(randint1E).
+smt().
+smt(randint1E).
+smt().
+smt(randint1E).
+smt().
+smt(randint1E).
+smt().
+smt(randint1E).
+smt().
+smt().
+(* stuck: s0 = ... - s0 *)
+admit.
+admit.
+admit.
+admit.*)
+
 auto.
 auto.
 progress.
@@ -412,12 +450,13 @@ have pneqi : p{2} <> sh by smt().
 rewrite pneqi /=.
 rewrite nth_put.
 rewrite size4 //.
-rewrite pneqi /=.
+by rewrite pneqi /=.
+(* extra code required for F4.share ~ F4.share * )
 rewrite nth_put //.
 rewrite size_put size4 //.
 rewrite pneqi /=.
 rewrite nth_put //.
-rewrite pneqi //.
+rewrite pneqi //.*)
 (* top right diagonal: pv still looking at a truly random element *)
 case (p{2} < sh) => [shgtp | sheqp].
 rewrite sum_four.
@@ -427,9 +466,11 @@ simplify.
 have pneqsh : p{2} <> sh.
 smt().
 rewrite pneqsh /=.
-rewrite nth_put // nth_put.
+rewrite nth_put //.
+(* proof for share ~ share * )
+rewrite nth_put.
 rewrite size_put //.
-rewrite pneqsh /=.
+rewrite pneqsh /= //.
 case (sh = 0) => [sh0 | shn0].
 rewrite sh0 nth_put /#.
 case (sh = 1) => [sh1 | shn1].
@@ -446,8 +487,39 @@ rewrite nth_put.
 trivial.
 simplify.
 (* x{1} - sum = x{2} - sum ... but x{1} != x{2}, just both uniform *)
-admit.
+admit.*)
+
+(* proof for share ~ sim *)
+by rewrite pneqsh /=.
+have p2eqsh : p{2} = sh.
+smt().
+rewrite p2eqsh /=.
+rewrite sum_four.
+rewrite size_put //.
+rewrite nth_put // nth_put // nth_put // nth_put //.
+simplify.
+case (sh = 0) => [sh0 | shn0].
+rewrite sh0 /=.
+have lhs_rand : x{1} - (s1{2} + s2{2} + s3{2}) \in randint.
+smt(randint_full).
+by rewrite (uniform_equiv (x{1} - (s1{2} + s2{2} + s3{2})) s0{2}).
+case (sh = 1) => [sh1 | shn1].
+rewrite sh1 /=.
+have lhs_rand : x{1} - (s0{2} + s2{2} + s3{2}) \in randint.
+smt(randint_full).
+by rewrite (uniform_equiv (x{1} - (s0{2} + s2{2} + s3{2})) s1{2}).
+case (sh = 2) => [sh2 | shn2].
+rewrite sh2 /=.
+have lhs_rand : x{1} - (s0{2} + s1{2} + s3{2}) \in randint.
+smt(randint_full).
+by rewrite (uniform_equiv (x{1} - (s0{2} + s1{2} + s3{2})) s2{2}).
+have sh3 : sh = 3 by smt().
+rewrite sh3 /=.
+have lhs_rand : x{1} - (s0{2} + s1{2} + s2{2}) \in randint.
+smt(randint_full).
+by rewrite (uniform_equiv (x{1} - (s0{2} + s1{2} + s2{2})) s3{2}).
 qed.
+
 
 (*
 (* on diag - pv is looking at a nonrandom share, x - sum(others) *)

@@ -1,5 +1,5 @@
 prover quorum=2 ["Alt-Ergo" "Z3"].
-timeout 1.  (* limit SMT solvers to two seconds *)
+timeout 2.  (* limit SMT solvers to two seconds *)
 require import AllCore Distr List.
 
 
@@ -92,7 +92,7 @@ module Sim = {
   (* simulator ignores x and p and just returns a random sharing
      we will argue that all rows of the matrix (parties' views)
      are indistinguishable. *)
-  proc share(x : int, p : party) : matrix = {
+  proc share(x : int) : matrix = {
     var s0, s1, s2, s3 : int;
     var shares : int list;
 
@@ -115,17 +115,17 @@ module Sim = {
     rx <$ randint;
     ry <$ randint;
 
-    mx <@ share(rx, i);
-    my <@ share(ry, j);
+    mx <@ share(rx);
+    my <@ share(ry);
     return mx + my;
   }
 }.
 
 module F4 = {
   
-  (* p has a value x and wants to share it with all other parties *)
-  proc share(x : int, p : party) : matrix = {
-    var s0, s1, s2, s_, s3 : int;
+  (* dealer has value x and wants to share it with all other parties *)
+  proc share(x : int) : matrix = {
+    var s0, s1, s2, s3, s_ : int;
 
     var shares : int list;
 
@@ -136,12 +136,9 @@ module F4 = {
     s3 <$ randint;
     shares <- [s0; s1; s2; s3];
 
-    (* zero out the p'th share *)
-    shares <- put shares p 0;
-
-    (* and set it such that the new sum equals x *)
-    s_ <- x - sumz(shares);
-    shares <- put shares p s_;
+    (* set last share such that the new sum equals x *)
+    s_ <- x - sumz(shares) + s3;
+    shares <- put shares 3 s_;
 
     (* TODO: basically every `offunm` call is going to have the structure
         if p_ = s then 0 else ...
@@ -154,6 +151,7 @@ module F4 = {
   (* parties si and sj know x, and want to send it to party d.
      g is exlcuded.
      todo: cheating identification (vs just abort)
+
    *)
   proc jmp(x : int, si sj d g  :party) : matrix = {
     (* TODO: party d gets x from si, and H(x) from sj *)
@@ -219,9 +217,8 @@ module F4 = {
     var z : int;
     var mx, my, mz : matrix;
 
-    (* assume P0 holds x and P1 holds y *)
-    mx <@ share(x, 0);
-    my <@ share(y, 1);
+    mx <@ share(x);
+    my <@ share(y);
 
     mz <@ mult(mx, my);
 
@@ -234,9 +231,9 @@ module F4 = {
     var z : int;
 
     (* party i has x *)
-    mx <@ share(x, i);
+    mx <@ share(x);
     (* party j has y *)
-    my <@ share(y, j);
+    my <@ share(y);
 
     (* addition is local *)
     mz <- mx + my;
@@ -294,39 +291,26 @@ smt().
 qed.
 
 (* Prove correctness of the sharing scheme. *)
-lemma share_correct(x_ : int, p_ : party) :
-    hoare[F4.share: x = x_ /\ p = p_ /\ 0 <= p_ < N ==> valid res /\ open res = x_].
+lemma share_correct(x_ : int) :
+    hoare[F4.share: x = x_ ==> valid res /\ open res = x_].
 proof.
 proc.
-seq 6 : (x = x_ /\ p = p_ /\ 0 <= p_ < N
-  /\ size shares = N
-  /\ nth err shares p_ = 0).
+seq 5 : (x = x_ /\ size shares = N /\ shares = [s0; s1; s2; s3]).
 auto.
 progress.
-rewrite size_put; smt(_4p).
-rewrite nth_put; smt(_4p).
-seq 1 : (
-  s_ = x - sumz shares
-  /\ x = x_ 
-  /\ size shares = N
-  /\ 0 <= p < N
-  /\ nth err shares p = 0).
+by rewrite _4p.
+seq 2 : (x = x_ /\ size shares = N /\ sumz shares = x).
 auto; progress.
-seq 1 : (sumz shares = x_
-  /\ x = x_
-  /\ size shares = N).
-auto.
-progress.
-(* sum = x *)
-rewrite (sum_replacement shares{hr} p{hr} (x{hr} - sumz shares{hr}) 0).
-by rewrite H0 H2 H H1 /= // _enz.
-smt().
+rewrite _4p // size_put //.
+rewrite sum_four.
 rewrite size_put //.
-(* matrix part *)
+rewrite nth_put // nth_put // nth_put // nth_put // /=.
+rewrite sum_four // /=.
+smt().
+(* valid *)
 auto.
 rewrite _4p.
 progress.
-(* valid *)
 rewrite rows_offunm _4p lez_maxr //.
 rewrite cols_offunm _4p lez_maxr //.
 rewrite get_offunm.
@@ -358,75 +342,34 @@ simplify.
 rewrite (sum_four shares{hr}) // /#.
 qed.
 
-(* want to argue: if both uniformly random, indistinguishable. this is not that. *)
-lemma uniform_equiv (x y) :
-    x \in randint /\ y \in randint => x = y.
-proof.
-rewrite 2!randint_full /=.
-admit.
-qed.
-
 (* Prove the sharing scheme is secure.
-   Party ps shares data. For any other party pv, view of real and simulated matrices look
-   the same.
+   For all parties, view looks random.
  *)
-lemma share_secure(ps, pv : party) :
+lemma share_secure(p : party) :
     equiv[F4.share ~ Sim.share :
-      ={p} /\ p{1} = ps /\ 0 <= ps < N
+      0 <= p < N       
       ==>
-      0 <= pv < N /\ pv <> ps => 
-      view res{1} pv = view res{2} pv].
+      view res{1} p = view res{2} p].
 proof.
 proc.
-(* si are all random *)
-seq 5 5 : (={p} /\ p{1} = ps /\ 0 <= ps < N /\
-  s0{1} \in randint /\ ={s0} /\
-  s1{1} \in randint /\ ={s1} /\
-  s2{1} \in randint /\ ={s2} /\
-  s3{1} \in randint /\ ={s3} /\
-  shares{1} = [s0{1}; s1{1}; s2{1}; s3{1}] /\
-  size shares{1} = 4 /\ ={shares}
-).
-(*
 wp.
-rnd (fun u => (x{1} - (s0{1} + s1{1} + s2{1}        )) - u).
-rnd (fun u => (x{1} - (s0{1} + s1{1} +         s3{1})) - u).
-rnd (fun u => (x{1} - (s0{1} +         s2{1} + s3{1})) - u).
-rnd (fun u => (x{1} - (        s1{1} + s2{1} + s3{1})) - u).
+seq 3 3 : (={s0, s1, s2} /\ 0 <= p < N).
 auto.
+simplify.
+rnd (fun u => u).
+auto.
+rewrite _4p.
 progress.
-smt().
+(*smt().
 smt(randint1E).
 smt().
-smt(randint1E).
-smt().
-smt(randint1E).
-smt().
-smt(randint1E).
-smt().
-smt(randint1E).
-smt().
-smt(randint1E).
-smt().
-smt(randint1E).
-smt().
-smt().
-(* stuck: s0 = ... - s0 *)
-admit.
-admit.
-admit.
-admit.*)
-
-auto.
-auto.
-progress.
-rewrite _4p in H0.
-rewrite _4p in H6.
+smt().*)
+(* views are equal *)
 rewrite /view /row.
-rewrite 2!cols_offunm _4p lez_maxr //.
+rewrite 2!cols_offunm lez_maxr //.
 rewrite eq_vectorP.
 rewrite 2!size_offunv lez_maxr // /=.
-move => sh. 
+move => sh.
 elim => shgt0 shlt4.
 rewrite get_offunv // get_offunv //.
 (* evaluate function calls *)
@@ -438,166 +381,32 @@ rewrite get_offunm.
 rewrite rows_offunm lez_maxr // cols_offunm lez_maxr //.
 progress.
 have size4 : size [s0{2}; s1{2}; s2{2}; s3{2}] = 4 by trivial.
-(* trivial when pv = sh => view on diagonal, so zero *)
-case (pv = sh) => [// | off_diag].
+(* trivial when p = sh => view on diagonal, so zero *)
+case (p = sh) => [// | off_diag].
 (* off diagonal: shares are indistinguishable *)
 rewrite nth_put.
-rewrite size_put.
-rewrite size4 H0 H //.
-(* bottom-left side of diagonal: pv is looking at a truly random element *)
-case (sh < p{2}) => [shltp | shgteqp].
-have pneqi : p{2} <> sh by smt().
-rewrite pneqi /=.
-rewrite nth_put.
 rewrite size4 //.
-by rewrite pneqi /=.
-(* extra code required for F4.share ~ F4.share * )
-rewrite nth_put //.
-rewrite size_put size4 //.
-rewrite pneqi /=.
-rewrite nth_put //.
-rewrite pneqi //.*)
-(* top right diagonal: pv still looking at a truly random element *)
-case (p{2} < sh) => [shgtp | sheqp].
-rewrite sum_four.
-rewrite size_put size4 //.
-rewrite nth_put // nth_put // nth_put // nth_put //.
-simplify.
-have pneqsh : p{2} <> sh.
-smt().
-rewrite pneqsh /=.
-rewrite nth_put //.
-(* proof for share ~ share * )
-rewrite nth_put.
-rewrite size_put //.
-rewrite pneqsh /= //.
-case (sh = 0) => [sh0 | shn0].
-rewrite sh0 nth_put /#.
-case (sh = 1) => [sh1 | shn1].
-rewrite sh1 nth_put /#.
-case (sh = 2) => [sh2 | shn2].
-rewrite sh2 nth_put /#.
-have sh3 : sh = 3 by smt().
-rewrite sh3 nth_put /#.
-have sheqp2 : sh = p{2} by smt().
-rewrite sheqp2 /=.
-rewrite nth_put.
-rewrite size_put /#.
-rewrite nth_put.
-trivial.
-simplify.
-(* x{1} - sum = x{2} - sum ... but x{1} != x{2}, just both uniform *)
-admit.*)
-
-(* proof for share ~ sim *)
-by rewrite pneqsh /=.
-have p2eqsh : p{2} = sh.
-smt().
-rewrite p2eqsh /=.
-rewrite sum_four.
-rewrite size_put //.
-rewrite nth_put // nth_put // nth_put // nth_put //.
-simplify.
-case (sh = 0) => [sh0 | shn0].
-rewrite sh0 /=.
-have lhs_rand : x{1} - (s1{2} + s2{2} + s3{2}) \in randint.
-smt(randint_full).
-by rewrite (uniform_equiv (x{1} - (s1{2} + s2{2} + s3{2})) s0{2}).
-case (sh = 1) => [sh1 | shn1].
-rewrite sh1 /=.
-have lhs_rand : x{1} - (s0{2} + s2{2} + s3{2}) \in randint.
-smt(randint_full).
-by rewrite (uniform_equiv (x{1} - (s0{2} + s2{2} + s3{2})) s1{2}).
-case (sh = 2) => [sh2 | shn2].
-rewrite sh2 /=.
-have lhs_rand : x{1} - (s0{2} + s1{2} + s3{2}) \in randint.
-smt(randint_full).
-by rewrite (uniform_equiv (x{1} - (s0{2} + s1{2} + s3{2})) s2{2}).
+(* bottom-left side of diagonal: p is looking at a truly random element *)
+case (sh < p) => [shltp | shgteqp].
+case (sh = 0) => [// | shn0].
+case (sh = 1) => [// | shn1].
+case (sh = 2) => [// | /#].
+(* sh >= p *)
+case (sh = 0) => [// | shn0].
+case (sh = 1) => [// | shn1].
+case (sh = 2) => [// | shn2].
 have sh3 : sh = 3 by smt().
 rewrite sh3 /=.
-have lhs_rand : x{1} - (s0{2} + s1{2} + s2{2}) \in randint.
-smt(randint_full).
-by rewrite (uniform_equiv (x{1} - (s0{2} + s1{2} + s2{2})) s3{2}).
-qed.
-
-
-(*
-(* on diag - pv is looking at a nonrandom share, x - sum(others) *)
-have shmp : sh - p{2} = 0.
-smt().
-rewrite shmp /=.
-have peqsh2 : p{2} = sh by smt().
-rewrite peqsh2.
-
-(* messy for now... party by party *)
-case (sh = 0) => [sh0 | _].
-rewrite sh0.
 rewrite sum_four.
-rewrite size_put.
-smt().
-rewrite nth_put // nth_put // nth_put // nth_put //.
+rewrite size4 //.
 simplify.
-have lhsrand : x{1} - (s1{2} + s2{2} + s3{2}) \in randint.
 
-rewrite randint_full.
-
-have uni : is_uniform randint.
+rewrite addr.
+have s3s3 : s3{1} = s3L.
 admit.
-rewrite /is_uniform in uni.
-have : mu1 randint (x{1} - (s1{2} + s2{2} + s3{2})) = mu1 randint s0{2}.
-smt().
-
-simplify.
-rewrite is_uniform.
-rewrite supportP in H1.
-rewrite supportP in 
-smt().
-
-(* share number = (party who shared) number 
-   note: we set it up so that sharing party keeps all random shares,
-   and gives (x - sum...) to all others
-
-   so this is actually the interesting part *)
-case (sh = p{2}) => [sheqp | shneqp].
-rewrite sheqp /=.
-(* actually interesting part *)
-rewrite sum_four.
-rewrite size_put size4 //.
-rewrite nth_put //.
-rewrite nth_put //.
-rewrite nth_put //.
-rewrite nth_put //.
-simplify.
-
-have sumsh : s0{1} + s1{1} + s2{1} + s3{1} = x{1}.
-
-case (p{2} = 0) => p0.
-rewrite p0.
-simplify.
-smt().
-case (p{2} = 1) => p1.
-rewrite p1 /= /#.
-case (p{2} = 2) => p2.
-rewrite p2 /= /#.
-have p3 : p{2} = 3 by smt().
-rewrite p3 /= /#.
-(* top-right side of diagonal *)
-have pltsh : (p{2} < sh).
-smt().
-have shpneq0 : sh - p{2} <> 0.
-smt().
-rewrite shpneq0 /=.
-rewrite nth_drop.
-smt().
-smt().
-rewrite nth_put.
-smt().
-have simp_mat_add : sh = p{2} + 1 + (sh - p{2} - 1)%Mat_A.ZR.
-  smt(addrA addrC).
-rewrite -simp_mat_add /=.
+rewrite s3s3.
 smt().
 qed.
-*)
 
 (* Prove addition is correct *)
 lemma add_correct(x_ y_ : int, pi pj : party) :
@@ -676,37 +485,6 @@ seq 0 2 : (0 <= pi < N /\ 0 <= pj < N).
 auto.
 progress.
 rewrite randint_ll.
-(*
-call (share_secure pi).
-call (share_secure pj).
-auto.
-progress.
-
-rewrite /view.
-rewrite 2!rowD.
-rewrite /view in H4.
-rewrite /view in H6.
-rewrite H6.
-seq 2 0 : true.
-call{1} (_ : true ==> true).
-proc.
-auto.
-progress.
-smt(randint_ll).
-call{1} (_ : true ==> true).
-proc.
-auto.
-progress.
-smt(randint_ll).
-auto.
-call{2} (_ : true ==> true).
-proc.
-auto.
-progress.
-smt(randint_ll).
-auto.
-progress.
-*)
 admit.
 qed.
 

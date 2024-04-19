@@ -384,11 +384,6 @@ auto.
 progress.
 rewrite _4p in H0.
 rewrite _4p in H6.
-(* rewrite matrices *)
-rewrite put_in.
-(* by rewrite size_put H H5 H0. *)
-(* convert view of matrix to vector *)
-rewrite size_put H H0 //.
 rewrite /view /row.
 rewrite 2!cols_offunm _4p lez_maxr //.
 rewrite eq_vectorP.
@@ -404,48 +399,37 @@ rewrite rows_offunm lez_maxr // cols_offunm lez_maxr //.
 rewrite get_offunm.
 rewrite rows_offunm lez_maxr // cols_offunm lez_maxr //.
 progress.
+have size4 : size [s0{2}; s1{2}; s2{2}; s3{2}] = 4 by trivial.
 (* trivial when pv = sh => view on diagonal, so zero *)
 case (pv = sh) => [// | off_diag].
 (* off diagonal: shares are indistinguishable *)
-rewrite nth_cat.
-rewrite size_take //.
+rewrite nth_put.
 rewrite size_put.
-have size4 : size [s0{2}; s1{2}; s2{2}; s3{2}] = 4 by trivial.
-rewrite size4 H0 /=.
+rewrite size4 H0 H //.
 (* bottom-left side of diagonal: pv is looking at a truly random element *)
 case (sh < p{2}) => [shltp | shgteqp].
-rewrite nth_take.
-rewrite H.
-rewrite shltp.
-rewrite nth_put.
-by rewrite H size4.
 have pneqi : p{2} <> sh by smt().
 rewrite pneqi /=.
 rewrite nth_put.
+rewrite size4 //.
+rewrite pneqi /=.
+rewrite nth_put //.
 rewrite size_put size4 //.
 rewrite pneqi /=.
 rewrite nth_put //.
-by rewrite pneqi /=.
+rewrite pneqi //.
 (* top right diagonal: pv still looking at a truly random element *)
 case (p{2} < sh) => [shgtp | sheqp].
 rewrite sum_four.
 rewrite size_put size4 //.
 rewrite nth_put // nth_put // nth_put // nth_put //.
 simplify.
-rewrite nth_drop.
+have pneqsh : p{2} <> sh.
 smt().
-smt().
-have shpneq0 : sh - p{2} <> 0.
-smt().
-rewrite shpneq0 /=.
-have simp_mat_add : sh = p{2} + 1 + (sh - p{2} - 1)%Mat_A.ZR.
-  smt(addrA addrC).
-rewrite -simp_mat_add /=.
-rewrite nth_put //.
-rewrite nth_put.
+rewrite pneqsh /=.
+rewrite nth_put // nth_put.
 rewrite size_put //.
-have p2neqsh : p{2} <> sh by smt().
-rewrite p2neqsh /=.
+rewrite pneqsh /=.
 case (sh = 0) => [sh0 | shn0].
 rewrite sh0 nth_put /#.
 case (sh = 1) => [sh1 | shn1].
@@ -610,7 +594,7 @@ qed.
 
 lemma add_secure(pi pj : party) :
     equiv[F4.add_main ~ Sim.add :
-      0 <= pi < N /\ 0 <= pi < N
+      0 <= pi < N /\ 0 <= pj < N
       ==>
       view res{1} pi = view res{2} pi \/ view res{1} pj = view res{2} pj].
 proof.
@@ -621,8 +605,8 @@ auto.
 progress.
 rewrite randint_ll.
 (*
-call (share_secure p1).
-call (share_secure p2).
+call (share_secure pi).
+call (share_secure pj).
 auto.
 progress.
 
@@ -651,8 +635,6 @@ smt(randint_ll).
 auto.
 progress.
 *)
-admit.
-admit.
 admit.
 qed.
 
@@ -852,23 +834,23 @@ smt().
 trivial.
 qed.
 
-(* TODO: validity *)
 (* Prove multiplication is correct *)
 lemma mul_correct(x_ y_ : int) :
     hoare[F4.mult_main : x = x_ /\ y = y_ ==> open res = x_ * y_ /\ valid res].
 proof.
 proc.
-(* expand sharing *)
+(* expand each sharing, one variable at a time *)
 seq 1 : (open mx = x_ /\ y = y_ /\ size mx = (N, N) /\ valid mx).
 auto.
 call (share_correct x_ 0).
 auto => />; progress; smt(_4p).
+
 seq 1 : (open mx = x_ /\ size mx = (N, N) /\ valid mx /\
          open my = y_ /\ size my = (N, N) /\ valid my).
-
 call (share_correct y_ 1).
-(*Validity proof*)
 auto => />; progress; smt(_4p).
+
+(* prove multiplication is correct *)
 inline F4.mult.
 wp; sp.
 exists* mx, my.
@@ -887,11 +869,14 @@ progress.
 by rewrite _4p.
 by rewrite _4p.
 by rewrite _4p.
+
 (* prove two sides open to the same matrix *)
 
 rewrite 6!open_linear.
 
+(* results from INP *)
 rewrite H7 H10 H13 H16 H19 H22.
+(* local multiply result *)
 rewrite /open _4p.
 rewrite get_offunm.
 by rewrite cols_offunm rows_offunm lez_maxr.
@@ -907,8 +892,8 @@ rewrite 3!mulzDr 12!mulzDl.
 rewrite 17!addrA.
 rewrite add_rearrange. 
 by simplify.
-(*Mult correct validity proof*)
-(* 1. prove size valid *)
+(* done correctness... now validity proof *)
+(* 1. prove size correct (N x N) *)
 rewrite 6!rows_addm.
 rewrite valid_size // valid_size // valid_size //
         valid_size // valid_size // valid_size //.
@@ -920,7 +905,6 @@ rewrite _4p //.
 
 (* 2. prove diag zero *)
 rewrite 6!get_addm.
-
 have alt4 : a < 4.
 move : H24.
 rewrite 6!rows_addm.
@@ -952,6 +936,8 @@ rewrite valid_size // valid_size // valid_size //
 rewrite _4p /= lez_maxr.
 smt().
 
+clear H24 H26.
+
 rewrite valid_size // valid_size // valid_size //
         valid_size // valid_size // valid_size //.
 rewrite _4p.
@@ -965,7 +951,6 @@ simplify.
 rewrite 5!get_addm.
 rewrite get_offunm.
 rewrite cols_offunm rows_offunm _4p lez_maxr //.
-
 trivial.
 simplify.
 have zneqp : 0 <> p by smt().
@@ -1052,4 +1037,3 @@ rewrite valid_size // valid_size // _4p /#.
 rewrite (valid_colp my{hr}) //.
 rewrite valid_size // valid_size // _4p /#.
 qed.
-

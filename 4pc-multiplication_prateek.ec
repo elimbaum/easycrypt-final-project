@@ -15,6 +15,8 @@ import Zmod.ComRing.*)
 import Zmod.Sub.
 import Zmod.ZModule.
 
+type zmod = Zmod.zmod.
+
 require (*---*) DynMatrix.
 (*
 
@@ -69,8 +71,8 @@ ZR.mulrDl by exact Zmod.ZModpRing.mulrDl.
 
 type party = int.
 
-import Mat_A.Matrices.
-import Mat_A.Vectors.
+import M.Matrices.
+import M.Vectors.
 
 op randint : int distr.
 axiom randint_ll : is_lossless randint.

@@ -6,18 +6,51 @@ require import Number StdOrder.
 (*---*) import RealOrder. 
 
 require import ZModP. 
-clone import ZModRing as Zmod.
+clone import ZModField as Zmod.
+(*
+import Zmod.Sub.
+import Zmod.ZModule.
+import Zmod.ComRing.*)
 
 require (*---*) DynMatrix.
 
 
 clone DynMatrix as Mat_A with
 type ZR.t <- Zmod.zmod,
-op ZR.zeror  <- Zmod.ZModpRing.zeror,
-op ZR.oner   <- Zmod.ZModpRing.oner,
-op ZR.( + )  <- Zmod.ZModpRing.( + ),
-op ZR.([-])  <- Zmod.ZModpRing.([-]),
-op ZR.( * )  <- Zmod.ZModpRing.( * )
+pred ZR.unit   <- Zmod.unit,
+op ZR.zeror  <- Zmod.zero,
+op ZR.oner   <- Zmod.one,
+op ZR.( + )  <- Zmod.( + ),
+op ZR.([-])  <- Zmod.([-]),
+op ZR.( * )  <- Zmod.( * ),
+op ZR.invr   <- Zmod.inv,
+op ZR.exp    <- Zmod.exp
+
+proof ZR.addrA by exact Zmod.ZModpField.addrA,
+ZR.addrC by exact Zmod.ZModpField.addrC,
+ZR.add0r by exact Zmod.ZModpField.add0r,
+ZR.addNr by exact Zmod.ZModpField.addNr,
+ZR.oner_neq0 by exact Zmod.ZModpField.oner_neq0,
+ZR.mulrA by exact Zmod.ZModpField.mulrA,
+ZR.mulrC by exact Zmod.ZModpField.mulrC,
+ZR.mul1r by exact Zmod.ZModpField.mul1r,
+ZR.mulrDl by exact Zmod.ZModpField.mulrDl,
+ZR.mulVr by exact Zmod.ZModpRing.mulVr,
+ZR.mulrV by exact Zmod.ZModpRing.mulrV,
+ZR.unitP by exact Zmod.ZModpRing.unitP,
+ZR.unitout by exact Zmod.ZModpRing.unitout,
+ZR.expr0 by exact Zmod.ZModpRing.expr0,
+ZR.exprS by exact Zmod.ZModpRing.exprS,
+ZR.exprN by exact Zmod.ZModpRing.exprN.
+
+(*
+clone DynMatrix as Mat_A with
+type ZR.t <- Zmod.zmod,
+op ZR.zeror  <- Zmod.zero,
+op ZR.oner   <- Zmod.one,
+op ZR.( + )  <- Zmod.( + ),
+op ZR.([-])  <- Zmod.([-]),
+op ZR.( * )  <- Zmod.( * )
 
 proof ZR.addrA by exact Zmod.ZModpRing.addrA,
 ZR.addrC by exact Zmod.ZModpRing.addrC,
@@ -28,6 +61,7 @@ ZR.mulrA by exact Zmod.ZModpRing.mulrA,
 ZR.mulrC by exact Zmod.ZModpRing.mulrC,
 ZR.mul1r by exact Zmod.ZModpRing.mul1r,
 ZR.mulrDl by exact Zmod.ZModpRing.mulrDl.
+*)
 
 
 type party = int.
@@ -71,58 +105,27 @@ op open(m : matrix) =
     m.[0, 1] + m.[0, 2] + m.[0, 3] + m.[1, 0].
 
 
-lemma add_rearrange1(t1 t2 t3 t4 t5 t6 t7 t8 : Zmod.zmod) :
+lemma add_rearrange1(t1 t2 t3 t4 t5 t6 t7 t8 :Zmod.zmod) :
    t1 + t2 + (t3 + t4) + (t5 + t6) + (t7 + t8) =
   t1 + t3 + t5 + t7 + (t2 + t4 + t6 + t8).
 proof.
 apply/asint_inj. 
-rewrite !addE !modzDml !modzDmr !addzA.
-rewrite !addzC.
-
-
+rewrite !addE.  
+rewrite !modzDml.
+rewrite /asint.
+admit.
 qed.
 
-
-
-
-lemma add_rearrange1(t1 t2 t3 t4 t5 t6 t7 t8 : Zmod.zmod) :
-   t1 + t2 + (t3 +  t4) + (t5 +  t6) + (t7 + t8) =
-  t1 + t3 + t5 + t7 + (t2 + t4 + t6 + t8).
-proof.
-
-apply/asint_inj.
-
-rewrite !addE.
-rewrite modzDml.
-rewrite modzDmr.
-rewrite modzDml.
-rewrite modzDmr.
-rewrite modzDml.
-rewrite modzDmr.
-rewrite modzDml.
-rewrite modzDmr.
-rewrite modzDml.
-rewrite modzDmr.
-rewrite modzDml.
-rewrite modzDmr.
-rewrite modzDml.
-rewrite modzDmr.
-rewrite modzDml.
-rewrite modzDmr.
-
-rewrite addrC.
-rewrite addrA.
-qed.
 
 
 lemma open_linear(mx my : matrix):
     open (mx + my) = open mx + open my.
 proof.
-
 progress.
 rewrite /open.
 rewrite 4!get_addm.
-
+rewrite add_rearrange1.
+trivial.
 qed.
 
 op valid(m : matrix) =

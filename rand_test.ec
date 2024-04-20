@@ -56,6 +56,22 @@ module M = {
     return a + b;
   }
 
+  proc h() : zmod = {
+    var a, b, c : zmod;
+    a <$ randint;
+    b <$ randint;
+    c <$ randint;
+    return a + b + c;
+  }
+
+  proc j(x : zmod) : zmod = {
+    var a, b, c, d : zmod;
+    a <$ randint;
+    b <$ randint;
+    c <$ randint;
+    return x - (a + b + c);
+  }
+
   proc g() : zmod = {
     var r : zmod;
     r <$ randint;
@@ -100,6 +116,14 @@ proof.
 by rewrite addS -addrA addNr addrC add0r.
 qed.
 
+lemma subD (a b c : zmod) :
+    a - (b + c) = a - b - c.
+proof.
+rewrite addS.
+rewrite !addrA.
+smt(addrA addrC add0r addNr).
+qed.
+
 lemma indist :
     equiv[M.f ~ M.g : true ==> ={res}].
 proof.
@@ -115,6 +139,12 @@ by rewrite -addS.
 smt(addrC addrA subrr).
 qed.
 
+lemma ababK (a b x : zmod) :
+    a + b + x - a - b = x.
+proof.
+smt(addrA addrC add0r addNr).
+qed.
+
 (* without seq, it doesn't work *)
 lemma indist_stuck :
     equiv[M.f ~ M.g : true ==> ={res}].
@@ -128,6 +158,33 @@ smt(addrC addrA subrr).
 (* stuck: aL + b0 = a{1} + aL *)
 admit.
 qed.
+
+lemma indist_h :
+    equiv[M.h ~ M.g : true ==> ={res}].
+proof.
+proc.
+seq 2 0 : true.
+auto.
+rnd (fun u=> a{1} + b{1} + u) (fun u => u - a{1} - b{1}).
+auto; progress.
+rewrite -addS.
+by rewrite subD.
+by rewrite ababK.
+qed.
+
+lemma indist_j (x : zmod) :
+    equiv[M.j ~ M.g : true ==> ={res}].
+proof.
+proc.
+seq 2 0 : true.
+auto.
+rnd (fun u => (x - (a{1} + b{1} + u)))
+    (fun u => (u - a{1} - b{1} + x)).
+auto.
+
+
+
+(* ---- *)
 
 op randint2 : int distr.
 

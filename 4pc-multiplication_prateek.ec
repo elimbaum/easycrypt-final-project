@@ -8,11 +8,13 @@ require import Number StdOrder.
 require import ZModP. 
 clone import ZModRing as Zmod.
 
+type zmod = Zmod.zmod.
+
 require (*---*) DynMatrix.
 
 
-clone DynMatrix as Mat_A with
-type ZR.t <- Zmod.zmod,
+clone DynMatrix as M with
+type ZR.t <- zmod,
 op ZR.zeror  <- Zmod.ZModpRing.zeror,
 op ZR.oner   <- Zmod.ZModpRing.oner,
 op ZR.( + )  <- Zmod.ZModpRing.( + ),
@@ -32,8 +34,8 @@ ZR.mulrDl by exact Zmod.ZModpRing.mulrDl.
 
 type party = int.
 
-import Mat_A.Matrices.
-import Mat_A.Vectors.
+import M.Matrices.
+import M.Vectors.
 
 op randint : int distr.
 axiom randint_ll : is_lossless randint.
@@ -70,59 +72,30 @@ op open(m : matrix) =
     (* add up party 0 shares, then add P1's x0... make this nicer? *)
     m.[0, 1] + m.[0, 2] + m.[0, 3] + m.[1, 0].
 
-
-lemma add_rearrange1(t1 t2 t3 t4 t5 t6 t7 t8 : Zmod.zmod) :
-   t1 + t2 + (t3 + t4) + (t5 + t6) + (t7 + t8) =
-  t1 + t3 + t5 + t7 + (t2 + t4 + t6 + t8).
+lemma addS (a b c : zmod) :
+    a + b = c <=> b = c - a.
 proof.
-apply/asint_inj. 
-rewrite !addE !modzDml !modzDmr !addzA.
-rewrite !addzC.
-
-
+smt(ZModule.addrC ZModule.addrA ZModule.addNr ZModule.add0r).
 qed.
 
-
-
-
-lemma add_rearrange1(t1 t2 t3 t4 t5 t6 t7 t8 : Zmod.zmod) :
-   t1 + t2 + (t3 +  t4) + (t5 +  t6) + (t7 + t8) =
-  t1 + t3 + t5 + t7 + (t2 + t4 + t6 + t8).
+lemma addK(a b c : zmod) :
+    b = c <=> a + b = a + c.
 proof.
-
-apply/asint_inj.
-
-rewrite !addE.
-rewrite modzDml.
-rewrite modzDmr.
-rewrite modzDml.
-rewrite modzDmr.
-rewrite modzDml.
-rewrite modzDmr.
-rewrite modzDml.
-rewrite modzDmr.
-rewrite modzDml.
-rewrite modzDmr.
-rewrite modzDml.
-rewrite modzDmr.
-rewrite modzDml.
-rewrite modzDmr.
-rewrite modzDml.
-rewrite modzDmr.
-
-rewrite addrC.
-rewrite addrA.
+split.
+smt(ZModule.addrC ZModule.addrA).
+progress.
+rewrite -{1}ZModule.add0r.
+rewrite -(ZModule.addNr a).
+smt(ZModule.addrC ZModule.addrA ZModule.addNr ZModule.add0r).
 qed.
-
 
 lemma open_linear(mx my : matrix):
     open (mx + my) = open mx + open my.
 proof.
-
-progress.
 rewrite /open.
-rewrite 4!get_addm.
-
+rewrite !get_addm.
+rewrite !ZModule.addrA.
+smt(ZModule.addrC ZModule.addrA).
 qed.
 
 op valid(m : matrix) =

@@ -121,7 +121,7 @@ lemma indist_stuck :
 proof.
 proc.
 rnd{1}.
-rnd (fun u => a{1} + u) (fun u => u - a{1}).
+rnd (fun u => b{1} + u) (fun u => u - b{1}).
 auto; progress.
 by rewrite -addS.
 smt(addrC addrA subrr).

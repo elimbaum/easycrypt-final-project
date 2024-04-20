@@ -1,28 +1,71 @@
 prover quorum=2 ["Alt-Ergo" "Z3"].
-timeout 2.  (* limit SMT solvers to two seconds *)
-require import AllCore Distr List.
+timeout 1.  (* limit SMT solvers to two seconds *)
+require import AllCore FSet List Distr.
+require import Bool IntDiv.
+require import Number StdOrder.
+(*---*) import RealOrder. 
 
+require import ZModP. 
+clone import ZModField as Zmod.
+(*
+import Zmod.Sub.
+import Zmod.ZModule.
+import Zmod.ComRing.*)
+
+import Zmod.Sub.
+import Zmod.ZModule.
 
 require (*---*) DynMatrix.
 
 
 clone DynMatrix as Mat_A with
-type ZR.t <- int,
-op ZR.zeror  <- 0,
-op ZR.oner   <- 1,
-op ZR.( + )  <- Top.Int.( + ),
-op ZR.([-])  <- Top.Int.([-]),
-op ZR.( * )  <- Top.Int.( * )
+type ZR.t <- Zmod.zmod,
+pred ZR.unit   <- Zmod.unit,
+op ZR.zeror  <- Zmod.zero,
+op ZR.oner   <- Zmod.one,
+op ZR.( + )  <- Zmod.( + ),
+op ZR.([-])  <- Zmod.([-]),
+op ZR.( * )  <- Zmod.( * ),
+op ZR.invr   <- Zmod.inv,
+op ZR.exp    <- Zmod.exp
 
-proof ZR.addrA by exact addrA,
-ZR.addrC by exact addrC,
-ZR.add0r by exact add0r,
-ZR.addNr by exact addNr,
-ZR.oner_neq0 by exact oner_neq0,
-ZR.mulrA by exact mulrA,
-ZR.mulrC by exact mulrC,
-ZR.mul1r by exact mul1r,
-ZR.mulrDl by exact mulrDl.
+proof ZR.addrA by exact Zmod.ZModpField.addrA,
+ZR.addrC by exact Zmod.ZModpField.addrC,
+ZR.add0r by exact Zmod.ZModpField.add0r,
+ZR.addNr by exact Zmod.ZModpField.addNr,
+ZR.oner_neq0 by exact Zmod.ZModpField.oner_neq0,
+ZR.mulrA by exact Zmod.ZModpField.mulrA,
+ZR.mulrC by exact Zmod.ZModpField.mulrC,
+ZR.mul1r by exact Zmod.ZModpField.mul1r,
+ZR.mulrDl by exact Zmod.ZModpField.mulrDl,
+ZR.mulVr by exact Zmod.ZModpRing.mulVr,
+ZR.mulrV by exact Zmod.ZModpRing.mulrV,
+ZR.unitP by exact Zmod.ZModpRing.unitP,
+ZR.unitout by exact Zmod.ZModpRing.unitout,
+ZR.expr0 by exact Zmod.ZModpRing.expr0,
+ZR.exprS by exact Zmod.ZModpRing.exprS,
+ZR.exprN by exact Zmod.ZModpRing.exprN.
+
+(*
+clone DynMatrix as Mat_A with
+type ZR.t <- Zmod.zmod,
+op ZR.zeror  <- Zmod.zero,
+op ZR.oner   <- Zmod.one,
+op ZR.( + )  <- Zmod.( + ),
+op ZR.([-])  <- Zmod.([-]),
+op ZR.( * )  <- Zmod.( * )
+
+proof ZR.addrA by exact Zmod.ZModpRing.addrA,
+ZR.addrC by exact Zmod.ZModpRing.addrC,
+ZR.add0r by exact Zmod.ZModpRing.add0r,
+ZR.addNr by exact Zmod.ZModpRing.addNr,
+ZR.oner_neq0 by exact Zmod.ZModpRing.oner_neq0,
+ZR.mulrA by exact Zmod.ZModpRing.mulrA,
+ZR.mulrC by exact Zmod.ZModpRing.mulrC,
+ZR.mul1r by exact Zmod.ZModpRing.mul1r,
+ZR.mulrDl by exact Zmod.ZModpRing.mulrDl.
+*)
+
 
 type party = int.
 
@@ -66,13 +109,16 @@ op open(m : matrix) =
     (* add up party 0 shares, then add P1's x0... make this nicer? *)
     m.[0, 1] + m.[0, 2] + m.[0, 3] + m.[1, 0].
 
+
 lemma open_linear(mx my : matrix):
     open (mx + my) = open mx + open my.
 proof.
-progress.
 rewrite /open.
-rewrite 4!get_addm /#.
+rewrite 4!get_addm.
+rewrite !addrA.
+smt(addrC addrA).
 qed.
+
 
 op valid(m : matrix) =
    (* matrix is NxN *)

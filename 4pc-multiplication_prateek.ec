@@ -6,20 +6,56 @@ require import Number StdOrder.
 (*---*) import RealOrder. 
 
 require import ZModP. 
-clone import ZModRing as Zmod.
+clone import ZModField as Zmod.
+(*
+import Zmod.Sub.
+import Zmod.ZModule.
+import Zmod.ComRing.*)
+
+import Zmod.Sub.
+import Zmod.ZModule.
 
 type zmod = Zmod.zmod.
 
 require (*---*) DynMatrix.
+(*
 
+clone DynMatrix as Mat_A with
+type ZR.t <- Zmod.zmod,
+pred ZR.unit   <- Zmod.unit,
+op ZR.zeror  <- Zmod.zero,
+op ZR.oner   <- Zmod.one,
+op ZR.( + )  <- Zmod.( + ),
+op ZR.([-])  <- Zmod.([-]),
+op ZR.( * )  <- Zmod.( * ),
+op ZR.invr   <- Zmod.inv,
+op ZR.exp    <- Zmod.exp
 
-clone DynMatrix as M with
-type ZR.t <- zmod,
-op ZR.zeror  <- Zmod.ZModpRing.zeror,
-op ZR.oner   <- Zmod.ZModpRing.oner,
-op ZR.( + )  <- Zmod.ZModpRing.( + ),
-op ZR.([-])  <- Zmod.ZModpRing.([-]),
-op ZR.( * )  <- Zmod.ZModpRing.( * )
+proof ZR.addrA by exact Zmod.ZModpField.addrA,
+ZR.addrC by exact Zmod.ZModpField.addrC,
+ZR.add0r by exact Zmod.ZModpField.add0r,
+ZR.addNr by exact Zmod.ZModpField.addNr,
+ZR.oner_neq0 by exact Zmod.ZModpField.oner_neq0,
+ZR.mulrA by exact Zmod.ZModpField.mulrA,
+ZR.mulrC by exact Zmod.ZModpField.mulrC,
+ZR.mul1r by exact Zmod.ZModpField.mul1r,
+ZR.mulrDl by exact Zmod.ZModpField.mulrDl,
+ZR.mulVr by exact Zmod.ZModpRing.mulVr,
+ZR.mulrV by exact Zmod.ZModpRing.mulrV,
+ZR.unitP by exact Zmod.ZModpRing.unitP,
+ZR.unitout by exact Zmod.ZModpRing.unitout,
+ZR.expr0 by exact Zmod.ZModpRing.expr0,
+ZR.exprS by exact Zmod.ZModpRing.exprS,
+ZR.exprN by exact Zmod.ZModpRing.exprN.
+*)
+
+clone DynMatrix as Mat_A with
+type ZR.t <- Zmod.zmod,
+op ZR.zeror  <- Zmod.zero,
+op ZR.oner   <- Zmod.one,
+op ZR.( + )  <- Zmod.( + ),
+op ZR.([-])  <- Zmod.([-]),
+op ZR.( * )  <- Zmod.( * )
 
 proof ZR.addrA by exact Zmod.ZModpRing.addrA,
 ZR.addrC by exact Zmod.ZModpRing.addrC,
@@ -30,6 +66,7 @@ ZR.mulrA by exact Zmod.ZModpRing.mulrA,
 ZR.mulrC by exact Zmod.ZModpRing.mulrC,
 ZR.mul1r by exact Zmod.ZModpRing.mul1r,
 ZR.mulrDl by exact Zmod.ZModpRing.mulrDl.
+
 
 
 type party = int.
@@ -72,31 +109,18 @@ op open(m : matrix) =
     (* add up party 0 shares, then add P1's x0... make this nicer? *)
     m.[0, 1] + m.[0, 2] + m.[0, 3] + m.[1, 0].
 
-lemma addS (a b c : zmod) :
-    a + b = c <=> b = c - a.
-proof.
-smt(ZModule.addrC ZModule.addrA ZModule.addNr ZModule.add0r).
-qed.
-
-lemma addK(a b c : zmod) :
-    b = c <=> a + b = a + c.
-proof.
-split.
-smt(ZModule.addrC ZModule.addrA).
-progress.
-rewrite -{1}ZModule.add0r.
-rewrite -(ZModule.addNr a).
-smt(ZModule.addrC ZModule.addrA ZModule.addNr ZModule.add0r).
-qed.
 
 lemma open_linear(mx my : matrix):
     open (mx + my) = open mx + open my.
 proof.
 rewrite /open.
-rewrite !get_addm.
-rewrite !ZModule.addrA.
-smt(ZModule.addrC ZModule.addrA).
+rewrite 4!get_addm.
+rewrite !addrA.
+smt(addrC addrA).
 qed.
+
+
+
 
 op valid(m : matrix) =
    (* matrix is NxN *)

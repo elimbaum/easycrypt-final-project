@@ -39,6 +39,8 @@ axiom ge0_L : 0 <= L.
 axiom randint1E (x : int) :
   mu1 randint x = 1%r / (2 ^ L)%r.
 
+axiom uniform_randint : is_uniform randint.
+
 (* from SMC example in class *)
 lemma randint_full : is_full randint.
 proof.
@@ -125,7 +127,7 @@ module F4 = {
   
   (* dealer has value x and wants to share it with all other parties *)
   proc share(x : int) : matrix = {
-    var s0, s1, s2, s3, s_ : int;
+    var s0, s1, s2, s_ : int;
 
     var shares : int list;
 
@@ -133,11 +135,10 @@ module F4 = {
     s0 <$ randint;
     s1 <$ randint;
     s2 <$ randint;
-    s3 <$ randint;
-    shares <- [s0; s1; s2; s3];
+    shares <- [s0; s1; s2; 0];
 
     (* set last share such that the new sum equals x *)
-    s_ <- x - sumz(shares) + s3;
+    s_ <- x - sumz(shares);
     shares <- put shares 3 s_;
 
     (* TODO: basically every `offunm` call is going to have the structure
@@ -295,7 +296,7 @@ lemma share_correct(x_ : int) :
     hoare[F4.share: x = x_ ==> valid res /\ open res = x_].
 proof.
 proc.
-seq 5 : (x = x_ /\ size shares = N /\ shares = [s0; s1; s2; s3]).
+seq 4 : (x = x_ /\ size shares = N /\ shares = [s0; s1; s2; 0]).
 auto.
 progress.
 by rewrite _4p.
@@ -342,6 +343,20 @@ simplify.
 rewrite (sum_four shares{hr}) // /#.
 qed.
 
+op rnd_f2 : int -> int.
+op rnd_g2 : int -> int.
+op rnd_f1 : int -> int.
+op rnd_g1 : int -> int.
+op rnd_f0 : int -> int.
+op rnd_g0 : int -> int.
+
+axiom f_g_inv_2 : forall x, rnd_f2 (rnd_g2 x) = x.
+axiom g_f_inv_2 : forall x, rnd_g2 (rnd_f2 x) = x.
+axiom f_g_inv_1 : forall x, rnd_f1 (rnd_g1 x) = x.
+axiom g_f_inv_1 : forall x, rnd_g1 (rnd_f1 x) = x.
+axiom f_g_inv_0 : forall x, rnd_f0 (rnd_g0 x) = x.
+axiom g_f_inv_0 : forall x, rnd_g0 (rnd_f0 x) = x.
+
 (* Prove the sharing scheme is secure.
    For all parties, view looks random.
  *)
@@ -353,17 +368,18 @@ lemma share_secure(p : party) :
 proof.
 proc.
 wp.
-seq 3 3 : (={s0, s1, s2} /\ 0 <= p < N).
-auto.
-simplify.
-rnd (fun u => u).
+rnd{2}.
+rnd rnd_f2 rnd_g2.
+rnd.
+rnd.
 auto.
 rewrite _4p.
 progress.
-(*smt().
+by rewrite f_g_inv_2.
 smt(randint1E).
-smt().
-smt().*)
+smt(randint_full).
+by rewrite g_f_inv_2.
+smt(randint_ll).
 (* views are equal *)
 rewrite /view /row.
 rewrite 2!cols_offunm lez_maxr //.
@@ -380,7 +396,7 @@ rewrite rows_offunm lez_maxr // cols_offunm lez_maxr //.
 rewrite get_offunm.
 rewrite rows_offunm lez_maxr // cols_offunm lez_maxr //.
 progress.
-have size4 : size [s0{2}; s1{2}; s2{2}; s3{2}] = 4 by trivial.
+have size4 : size [s0L; s1L; s2L; 0] = 4 by trivial.
 (* trivial when p = sh => view on diagonal, so zero *)
 case (p = sh) => [// | off_diag].
 (* off diagonal: shares are indistinguishable *)
@@ -390,18 +406,36 @@ rewrite size4 //.
 case (sh < p) => [shltp | shgteqp].
 case (sh = 0) => [// | shn0].
 case (sh = 1) => [// | shn1].
-case (sh = 2) => [// | /#].
+case (sh = 2) => [sh2 | shn2].
+rewrite sh2 /=.
+
+rewrite H5.
+rewrite H7.
+
 (* sh >= p *)
-case (sh = 0) => [// | shn0].
-case (sh = 1) => [// | shn1].
-case (sh = 2) => [// | shn2].
+case (sh = 0) => [sh0 | shn0].
+rewrite sh0 /=.
+admit.
+case (sh = 1) => [sh1 | shn1].
+rewrite sh1 /=.
+admit.
+case (sh = 2) => [sh2 | shn2].
+rewrite sh2 /=.
+admit.
 have sh3 : sh = 3 by smt().
 rewrite sh3 /=.
 rewrite sum_four.
 rewrite size4 //.
 simplify.
 
-rewrite addr.
+rewrite nth_put // /=.
+rewrite sum_four.
+rewrite size4 //.
+simplify.
+have xeq : x{1} = x{2}.
+admit.
+rewrite xeq /=.
+smt().
 have s3s3 : s3{1} = s3L.
 admit.
 rewrite s3s3.

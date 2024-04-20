@@ -17,9 +17,10 @@ import Zmod.ZModule.
 
 require (*---*) DynMatrix.
 
+type elem = Zmod.zmod.
 
 clone DynMatrix as Mat_A with
-type ZR.t <- Zmod.zmod,
+type ZR.t <- elem,
 pred ZR.unit   <- Zmod.unit,
 op ZR.zeror  <- Zmod.zero,
 op ZR.oner   <- Zmod.one,
@@ -48,7 +49,7 @@ ZR.exprN by exact Zmod.ZModpRing.exprN.
 
 (*
 clone DynMatrix as Mat_A with
-type ZR.t <- Zmod.zmod,
+type ZR.t <- elem,
 op ZR.zeror  <- Zmod.zero,
 op ZR.oner   <- Zmod.one,
 op ZR.( + )  <- Zmod.( + ),
@@ -72,23 +73,23 @@ type party = int.
 import Mat_A.Matrices.
 import Mat_A.Vectors.
 
-op randint : int distr.
-axiom randint_ll : is_lossless randint.
+op randelem : elem distr.
+axiom randelem_ll : is_lossless randelem.
 
 (* bitwidth of int *)
 op L : int.
 axiom ge0_L : 0 <= L.
 
-axiom randint1E (x : int) :
-  mu1 randint x = 1%r / (2 ^ L)%r.
+axiom randelem1E (x : elem) :
+  mu1 randelem x = 1%r / (2 ^ L)%r.
 
-axiom uniform_randint : is_uniform randint.
+axiom uniform_randelem : is_uniform randelem.
 
 (* from SMC example in class *)
-lemma randint_full : is_full randint.
+lemma randelem_full : is_full randelem.
 proof.
 move => x.
-rewrite /support randint1E.
+rewrite /support randelem1E.
 by rewrite RField.div1r StdOrder.RealOrder.invr_gt0 lt_fromint StdOrder.IntOrder.expr_gt0.
 qed.
 
@@ -101,8 +102,30 @@ op N : int.
 axiom _4p : N = 4.
 
 (* An unspecified non-zero error value *)
-op err : int.
-axiom _enz : err <> 0.
+op err : elem.
+axiom _enz : err <> zero.
+
+(* Calculate sum of elems in list of elems *)
+op sumz_elem (sz : elem list) = foldr Zmod.(+) zero sz.
+
+(* UNUSED LEMMAS
+lemma addS (a b c : zmod) :
+    a + b = c <=> b = c - a.
+proof.
+smt(addrC addrA addNr add0r).
+qed.
+
+lemma addK(a b c : zmod) :
+    b = c <=> a + b = a + c.
+proof.
+split.
+smt(addrC addrA).
+progress.
+rewrite -{1}add0r.
+rewrite -(addNr a).
+smt(addrC addrA addNr add0r).
+qed.
+*)
 
 op open(m : matrix) =
     (* consistency check? or precondition? *)
@@ -124,7 +147,7 @@ op valid(m : matrix) =
    (* matrix is NxN *)
    size m = (N, N)
    (* diagonal is zero *)
-   /\ (forall (a : int), mrange m a a => m.[a, a] = 0)
+   /\ (forall (a : int), mrange m a a => m.[a, a] = zero)
    (* off diagonal, each column identical for all parties *)
    /\ (forall s, forall p, mrange m p s /\ p <> s /\ s = 0 => 
           (* for share 0, all shares equal to party 1's *)
@@ -136,32 +159,33 @@ op valid(m : matrix) =
 op view(m : matrix, p : party) =
   row m p.
 
+
 module Sim = {
   (* simulator ignores x and p and just returns a random sharing
      we will argue that all rows of the matrix (parties' views)
      are indistinguishable. *)
-  proc share(x : int) : matrix = {
-    var s0, s1, s2, s3 : int;
-    var shares : int list;
+  proc share(x : elem) : matrix = {
+    var s0, s1, s2, s3 : elem;
+    var shares : elem list;
 
     (* generate random *)
-    s0 <$ randint;
-    s1 <$ randint;
-    s2 <$ randint;
-    s3 <$ randint;
+    s0 <$ randelem;
+    s1 <$ randelem;
+    s2 <$ randelem;
+    s3 <$ randelem;
 
     shares <- [s0; s1; s2; s3];
 
     return offunm ((fun p_ s =>
-        if p_ = s then 0 else (nth err shares s)), N, N);
+        if p_ = s then zero else (nth err shares s)), N, N);
   }
 
   proc add(x y : int, i j : party) : matrix = {
     var mx, my : matrix;
-    var rx, ry : int;
+    var rx, ry : elem;
 
-    rx <$ randint;
-    ry <$ randint;
+    rx <$ randelem;
+    ry <$ randelem;
 
     mx <@ share(rx);
     my <@ share(ry);
@@ -169,22 +193,23 @@ module Sim = {
   }
 }.
 
+
 module F4 = {
   
   (* dealer has value x and wants to share it with all other parties *)
-  proc share(x : int) : matrix = {
-    var s0, s1, s2, s_ : int;
+  proc share(x : elem) : matrix = {
+    var s0, s1, s2, s_ : elem;
 
-    var shares : int list;
+    var shares : elem list;
 
     (* generate random *)
-    s0 <$ randint;
-    s1 <$ randint;
-    s2 <$ randint;
-    shares <- [s0; s1; s2; 0];
+    s0 <$ randelem;
+    s1 <$ randelem;
+    s2 <$ randelem;
+    shares <- [s0; s1; s2; zero];
 
     (* set last share such that the new sum equals x *)
-    s_ <- x - sumz(shares);
+    s_ <- x - sumz_elem(shares);
     shares <- put shares 3 s_;
 
     (* TODO: basically every `offunm` call is going to have the structure
@@ -192,7 +217,7 @@ module F4 = {
        maybe we can factor that out?
      *)
     return offunm ((fun p_ s =>
-        if p_ = s then 0 else (nth err shares s)), N, N);
+        if p_ = s then zero else (nth err shares s)), N, N);
   }
 
   (* parties si and sj know x, and want to send it to party d.
@@ -200,27 +225,27 @@ module F4 = {
      todo: cheating identification (vs just abort)
 
    *)
-  proc jmp(x : int, si sj d g  :party) : matrix = {
+  proc jmp(x : elem, si sj d g  :party) : matrix = {
     (* TODO: party d gets x from si, and H(x) from sj *)
     (* abort if hashes don't check out *)
     var mjmp : matrix;
 
     mjmp <- offunm ((fun p s =>
-        if p = s then 0 else
-        if g = s then x else 0), N, N);
+        if p = s then zero else
+        if g = s then x else zero), N, N);
     return mjmp;
   }
 
   (* parties i and j know x, and want to share it with the two other
      parties g and h.
    *)
-  proc inp(x : int, i j g h : party) : matrix = {
-    var r, xh : int;
+  proc inp(x : elem, i j g h : party) : matrix = {
+    var r, xh : elem;
     var pgm, minp : matrix;
 
     (* in the paper this is a PRF, but for now model as truly random
        and just don't give it to party g. *)
-    r <$ randint;
+    r <$ randelem;
 
     xh <- x - r;
 
@@ -229,8 +254,8 @@ module F4 = {
 
     (* xi = xj = 0, xg = r, xh = x - r *)
     minp <- pgm + offunm ((fun p s => 
-      if s = p then 0 else
-      if s = h then r else 0), N, N);
+      if s = p then zero else
+      if s = h then r else zero), N, N);
     return minp;
   }
 
@@ -254,14 +279,13 @@ module F4 = {
     (* elementwise multiplication to create sharing of x_i * y_i
        this implements inp_local: no communication occurs *)
     mlocal <- offunm ((fun p s => 
-      if s = p then 0 else x.[p, s] * y.[p, s]), N, N);
+      if s = p then zero else x.[p, s] * y.[p, s]), N, N);
 
     (* elementwise addition *)
     return m01 + m02 + m03 + m12 + m13 + m23 + mlocal;   
   }
 
-  proc mult_main(x y : int) : matrix = {
-    var z : int;
+  proc mult_main(x y : elem) : matrix = {
     var mx, my, mz : matrix;
 
     mx <@ share(x);
@@ -273,9 +297,8 @@ module F4 = {
   }
 
 
-  proc add_main(x y : int, i j : party) : matrix = {
+  proc add_main(x y : elem, i j : party) : matrix = {
     var mx, my, mz : matrix;
-    var z : int;
 
     (* party i has x *)
     mx <@ share(x);
@@ -291,12 +314,12 @@ module F4 = {
 
 
 (* sum of four element list is the sum of the individual elements *)
-lemma sum_four(s : int list) :
-    size s = 4 => sumz s = 
+lemma sum_four(s : elem list) :
+    size s = 4 => sumz_elem s = 
     nth err s 0 + nth err s 1 + nth err s 2 + nth err s 3.
 proof.
 progress.
-rewrite /sumz -{1}take_size H.
+rewrite /sumz_elem -{1}take_size H.
 have T4 : take 4 s = rcons (take 3 s) (nth err s 3).
   rewrite -take_nth.
   rewrite H // take_nth.
@@ -314,12 +337,14 @@ have T1 : take 1 s = rcons (take 0 s) (nth err s 0).
   rewrite H // take_nth.
   by simplify.
 rewrite T4 T3 T2 T1 take0.
-smt().
+smt(addrA addrC add0r).
 qed.
 
+(*
 (* replacing zero value in list with `x` increases the sum by `x` *)
-lemma sum_replacement(shares : int list, i x y : int) :
-    0 <= i < size shares /\ size shares = N /\ nth err shares i = y  => sumz (put shares i x) = x - y + sumz shares.
+lemma sum_replacement(shares : elem list, i: int, x, y: elem) :
+    0 <= i < size shares /\ size shares = N /\ nth err shares i = y  => 
+    sumz_elem (put shares i x) = x - y + sumz_elem shares.
 proof.
 progress.
 rewrite _4p in H1.
@@ -334,26 +359,28 @@ rewrite nth_put.
 smt().
 rewrite nth_put.
 smt().
-smt().
+smt()
 qed.
+*)
+
 
 (* Prove correctness of the sharing scheme. *)
-lemma share_correct(x_ : int) :
+lemma share_correct(x_ : elem) :
     hoare[F4.share: x = x_ ==> valid res /\ open res = x_].
 proof.
 proc.
-seq 4 : (x = x_ /\ size shares = N /\ shares = [s0; s1; s2; 0]).
+seq 4 : (x = x_ /\ size shares = N /\ shares = [s0; s1; s2; zero]).
 auto.
 progress.
 by rewrite _4p.
-seq 2 : (x = x_ /\ size shares = N /\ sumz shares = x).
+seq 2 : (x = x_ /\ size shares = N /\ sumz_elem shares = x).
 auto; progress.
 rewrite _4p // size_put //.
 rewrite sum_four.
 rewrite size_put //.
 rewrite nth_put // nth_put // nth_put // nth_put // /=.
 rewrite sum_four // /=.
-smt().
+smt(addrC addrA addNr add0r).
 (* valid *)
 auto.
 rewrite _4p.
@@ -386,22 +413,23 @@ rewrite get_offunm.
 rewrite rows_offunm cols_offunm => /=; smt(_4p).
 simplify.
 (* sums match *)
-rewrite (sum_four shares{hr}) // /#.
+rewrite (sum_four shares{hr}) //.
+smt(addrC addrA addNr add0r).
 qed.
 
-op rnd_f2 : int -> int.
-op rnd_g2 : int -> int.
-op rnd_f1 : int -> int.
-op rnd_g1 : int -> int.
-op rnd_f0 : int -> int.
-op rnd_g0 : int -> int.
+op rnd_f2 : elem -> elem.
+op rnd_g2 : elem -> elem.
+op rnd_f1 : elem -> elem.
+op rnd_g1 : elem -> elem.
+op rnd_f0 : elem -> elem.
+op rnd_g0 : elem -> elem.
 
-axiom f_g_inv_2 : forall x, rnd_f2 (rnd_g2 x) = x.
-axiom g_f_inv_2 : forall x, rnd_g2 (rnd_f2 x) = x.
-axiom f_g_inv_1 : forall x, rnd_f1 (rnd_g1 x) = x.
-axiom g_f_inv_1 : forall x, rnd_g1 (rnd_f1 x) = x.
-axiom f_g_inv_0 : forall x, rnd_f0 (rnd_g0 x) = x.
-axiom g_f_inv_0 : forall x, rnd_g0 (rnd_f0 x) = x.
+axiom f_g_inv_2 : forall (x: elem), rnd_f2 (rnd_g2 x) = x.
+axiom g_f_inv_2 : forall (x: elem), rnd_g2 (rnd_f2 x) = x.
+axiom f_g_inv_1 : forall (x: elem), rnd_f1 (rnd_g1 x) = x.
+axiom g_f_inv_1 : forall (x: elem), rnd_g1 (rnd_f1 x) = x.
+axiom f_g_inv_0 : forall (x: elem), rnd_f0 (rnd_g0 x) = x.
+axiom g_f_inv_0 : forall (x: elem), rnd_g0 (rnd_f0 x) = x.
 
 (* Prove the sharing scheme is secure.
    For all parties, view looks random.
@@ -422,10 +450,10 @@ auto.
 rewrite _4p.
 progress.
 by rewrite f_g_inv_2.
-smt(randint1E).
-smt(randint_full).
+smt(randelem1E).
+smt(randelem_full).
 by rewrite g_f_inv_2.
-smt(randint_ll).
+smt(randelem_ll).
 (* views are equal *)
 rewrite /view /row.
 rewrite 2!cols_offunm lez_maxr //.
@@ -442,13 +470,14 @@ rewrite rows_offunm lez_maxr // cols_offunm lez_maxr //.
 rewrite get_offunm.
 rewrite rows_offunm lez_maxr // cols_offunm lez_maxr //.
 progress.
-have size4 : size [s0L; s1L; s2L; 0] = 4 by trivial.
+have size4 : size [s0L; s1L; s2L; zero] = 4 by trivial.
 (* trivial when p = sh => view on diagonal, so zero *)
 case (p = sh) => [// | off_diag].
 (* off diagonal: shares are indistinguishable *)
 rewrite nth_put.
 rewrite size4 //.
 (* bottom-left side of diagonal: p is looking at a truly random element *)
+(*
 case (sh < p) => [shltp | shgteqp].
 case (sh = 0) => [// | shn0].
 case (sh = 1) => [// | shn1].
@@ -486,10 +515,12 @@ have s3s3 : s3{1} = s3L.
 admit.
 rewrite s3s3.
 smt().
+*)
+admit.
 qed.
 
 (* Prove addition is correct *)
-lemma add_correct(x_ y_ : int, pi pj : party) :
+lemma add_correct(x_ y_ : elem, pi pj : party) :
     hoare[F4.add_main : x = x_ /\ y = y_ /\ i = pi /\ j = pj /\ 0 <= pi < N /\ 0 <= pj < N
       ==> valid res /\ open res = x_ + y_].
 proof.
@@ -499,12 +530,12 @@ have n4 : N = 4 by rewrite _4p.
 seq 1 : (open mx = x_ /\ y = y_ /\ size mx = (N, N) /\ valid mx /\ j{hr} = pj /\ 0 <= pj < N).
 
 auto.
-call (share_correct x_ pi).
+call (share_correct x_).
 auto => />; progress; smt().
 
 seq 1 : (open mx = x_ /\ size mx = (N, N) /\ valid mx /\
          open my = y_ /\ size my = (N, N) /\ valid my).
-call (share_correct y_ pj).
+call (share_correct y_).
 (*Validity proof*)
 auto => />; progress; smt().
 wp.
@@ -516,7 +547,16 @@ move => &hr rows_mx cols_mx _ _ diag_mx not_diag_mx_left not_diag_mx_right rows_
 progress.
 rewrite rows_addm rows_mx rows_my /#.
 rewrite cols_addm cols_mx cols_my /#.
-rewrite get_addm; smt().
+rewrite get_addm.
+rewrite diag_mx.
+
+progress.
+rewrite rows_addm in H0.
+smt().
+rewrite cols_addm in H1.
+smt().
+smt(add0r).
+
 rewrite 2!get_addm.
 have mxp0_eq_mx10: mrange mx{hr} p 0 /\ p <> 0 => mx{hr}.[p,0] = mx{hr}.[1, 0] by smt().
 rewrite mxp0_eq_mx10.
@@ -529,6 +569,7 @@ rewrite H.
 rewrite rows_addm in H0.
 smt().
 smt().
+
 rewrite 2!get_addm.
 have mxps_eq_mx0s: mrange mx{hr} p s /\ p <> s /\ s <> 0 => mx{hr}.[p,s] = mx{hr}.[0, s].
 progress.
@@ -539,6 +580,7 @@ rewrite rows_addm in H0.
 smt().
 rewrite cols_addm in H2.
 smt().
+
 have myps_eq_my0s: mrange my{hr} p s /\ p <> s /\ s <> 0 => my{hr}.[p,s] = my{hr}.[0, s]. 
 progress.
 by smt().
@@ -548,6 +590,7 @@ rewrite rows_addm in H0.
 smt().
 rewrite cols_addm in H2.
 smt().
+
 smt().
 (*Corretness proof*)
 by rewrite open_linear.
@@ -564,10 +607,11 @@ wp.
 seq 0 2 : (0 <= pi < N /\ 0 <= pj < N).
 auto.
 progress.
-rewrite randint_ll.
+rewrite randelem_ll.
 admit.
 qed.
 
+(*
 (* TODO: maybe do something like this to simplify all of the get/rows/cols proof steps below *)
 lemma offunm_unwrap (i, j : party, f : party -> int -> int):
     0 <= i < N /\ 0 <= j < N => (offunm (fun(x y) => f x y, N, N)).[i, j] = f i j.
@@ -579,9 +623,11 @@ move : H0 H2.
 by rewrite _4p.
 by simplify.
 qed.
+*)
+
 
 (* Prove correctness of the jmp. *)
-lemma jmp_correct(x_ : int, si_ sj_ d_ g_: party) :
+lemma jmp_correct(x_ : elem, si_ sj_ d_ g_: party) :
     hoare[F4.jmp : x = x_ /\ si = si_ /\ 
       sj = sj_ /\ d = d_ /\ g = g_ /\ 0 <= g_ < N
       ==>
@@ -619,11 +665,18 @@ by rewrite rows_offunm cols_offunm => /=.
 rewrite get_offunm.
 by rewrite rows_offunm cols_offunm => /=.
 simplify.
-smt(_4p sum_four).
+case: (2 < g{hr}).
+ by smt(add0r).
+case: (1 < g{hr}).
+ by smt(add0r).
+case: (0 = g{hr}).
+ by smt(add0r).
+progress.
+smt(add0r addrC).
 qed.
 
 (* Prove correctness of inp. *)
-lemma inp_correct(x_ : int, i_ j_ g_ h_: party) :
+lemma inp_correct(x_ : elem, i_ j_ g_ h_: party) :
     hoare[F4.inp : x = x_ /\ i = i_ /\
       j = j_ /\ h = h_ /\ g = g_ /\ 0 <= h_ < N
       ==>
@@ -654,7 +707,10 @@ rewrite get_addm.
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm /#.
 simplify.
-by rewrite diag0.
+rewrite diag0.
+smt(add0r).
+smt(add0r).
+
 
 (* columns are equal *)
 rewrite 2!get_addm.
@@ -675,6 +731,7 @@ rewrite rows_addm rowsn rows_offunm /#.
 move: H1.
 rewrite cols_addm colsn cols_offunm /#.
 smt().
+
 rewrite 2!get_addm.
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm.
@@ -696,6 +753,7 @@ simplify.
 have resultps_eq_result0s: mrange result p s /\ p <> s /\ s <> 0 => result.[p, s] = result.[0, s].
 progress.
 smt().
+
 rewrite resultps_eq_result0s.
 progress.
 move: H0.
@@ -705,6 +763,7 @@ rewrite cols_offunm colsn cols_offunm /#.
 have s_noteq_p: s <> p by smt().
 rewrite H4 s_noteq_p /#.
 (* begin correctness proof *)
+
 rewrite open_linear.
 rewrite /open.
 rewrite get_offunm.
@@ -716,7 +775,13 @@ rewrite cols_offunm rows_offunm /#.
 rewrite get_offunm.
 rewrite cols_offunm rows_offunm /#.
 simplify.
-smt(_4p).
+case: (2 < h_).
+ by smt(addrC addrA addNr add0r).
+case: (1 < h_).
+ by smt(addrC addrA addNr add0r).
+case: (h_ = 0).
+ by smt(addrC addrA addNr add0r).
+smt(addrC addrA addNr add0r).
 qed.
 
 (* annoying, but if we try to smt() this down below without the intermediate lemma,
@@ -738,7 +803,7 @@ smt().
 qed.
 
 lemma valid_diag0(m : matrix) :
-    valid m => forall a, m.[a, a] = 0.
+    valid m => forall a, m.[a, a] = zero.
 proof.
 rewrite /valid.
 smt().
@@ -765,19 +830,19 @@ trivial.
 qed.
 
 (* Prove multiplication is correct *)
-lemma mul_correct(x_ y_ : int) :
+lemma mul_correct(x_ y_ : elem) :
     hoare[F4.mult_main : x = x_ /\ y = y_ ==> open res = x_ * y_ /\ valid res].
 proof.
 proc.
 (* expand each sharing, one variable at a time *)
 seq 1 : (open mx = x_ /\ y = y_ /\ size mx = (N, N) /\ valid mx).
 auto.
-call (share_correct x_ 0).
+call (share_correct x_).
 auto => />; progress; smt(_4p).
 
 seq 1 : (open mx = x_ /\ size mx = (N, N) /\ valid mx /\
          open my = y_ /\ size my = (N, N) /\ valid my).
-call (share_correct y_ 1).
+call (share_correct y_).
 auto => />; progress; smt(_4p).
 
 (* prove multiplication is correct *)
@@ -817,11 +882,18 @@ by rewrite cols_offunm rows_offunm lez_maxr.
 rewrite get_offunm.
 by rewrite cols_offunm rows_offunm lez_maxr.
 simplify.
+
+
 (* algebra *)
-rewrite 3!mulzDr 12!mulzDl.
+(* NEEDS TO BE REDONE!!!!
+rewrite !addrA.
+rewrite multrDr.
+rewrite 3!mulrDr 12!mulrDl.
 rewrite 17!addrA.
 rewrite add_rearrange. 
 by simplify.
+*)
+admit.
 (* done correctness... now validity proof *)
 (* 1. prove size correct (N x N) *)
 rewrite 6!rows_addm.
@@ -845,7 +917,9 @@ rewrite _4p //.
 clear H24 H26.
 rewrite valid_diag0 // valid_diag0 // valid_diag0 //
         valid_diag0 // valid_diag0 // valid_diag0 //.
-rewrite get_offunm /= // _4p //.
+rewrite get_offunm /= //.
+rewrite _4p //.
+smt(zeroE).
 
 (* 3a. prove columns consistent *)
 (* don't actually need open anymore *)
@@ -933,6 +1007,8 @@ rewrite rows_offunm cols_offunm.
 rewrite valid_size // valid_size // valid_size //
         valid_size // valid_size // valid_size //.
 rewrite _4p.
+rewrite /max.
+simplify.
 smt().
 
 simplify.

@@ -73,24 +73,21 @@ type party = int.
 import Mat_A.Matrices.
 import Mat_A.Vectors.
 
-op randelem : elem distr.
-axiom randelem_ll : is_lossless randelem.
+(* DISTRIBUTION *)
+import Zmod.DZmodP.
 
-(* bitwidth of int *)
-op L : int.
-axiom ge0_L : 0 <= L.
+op randelem : zmod distr = dunifin.
 
-axiom randelem1E (x : elem) :
-  mu1 randelem x = 1%r / (2 ^ L)%r.
+lemma randelem_full: is_full randelem by exact dunifin_fu.
 
-axiom uniform_randelem : is_uniform randelem.
+lemma randelem1E (s : zmod) : mu1 randelem s = (1%r / p%r)%Real
+  by rewrite dunifin1E cardE.
 
-(* from SMC example in class *)
-lemma randelem_full : is_full randelem.
+lemma randelem_ll: is_lossless randelem by exact dunifin_ll.
+
+lemma randelem_funi: is_funiform randelem.
 proof.
-move => x.
-rewrite /support randelem1E.
-by rewrite RField.div1r StdOrder.RealOrder.invr_gt0 lt_fromint StdOrder.IntOrder.expr_gt0.
+by move=> ??; rewrite !randelem1E.
 qed.
 
 (* WARNING: matrices are zero indexed, so we need to have share 0, party 0 *)
@@ -132,7 +129,6 @@ op open(m : matrix) =
     (* add up party 0 shares, then add P1's x0... make this nicer? *)
     m.[0, 1] + m.[0, 2] + m.[0, 3] + m.[1, 0].
 
-
 lemma open_linear(mx my : matrix):
     open (mx + my) = open mx + open my.
 proof.
@@ -169,10 +165,10 @@ module Sim = {
     var shares : elem list;
 
     (* generate random *)
+    s3 <$ randelem;
     s0 <$ randelem;
     s1 <$ randelem;
     s2 <$ randelem;
-    s3 <$ randelem;
 
     shares <- [s0; s1; s2; s3];
 
@@ -417,19 +413,11 @@ rewrite (sum_four shares{hr}) //.
 smt(addrC addrA addNr add0r).
 qed.
 
-op rnd_f2 : elem -> elem.
-op rnd_g2 : elem -> elem.
-op rnd_f1 : elem -> elem.
-op rnd_g1 : elem -> elem.
-op rnd_f0 : elem -> elem.
-op rnd_g0 : elem -> elem.
+op rnd_f : elem -> elem.
+op rnd_g : elem -> elem.
 
-axiom f_g_inv_2 : forall (x: elem), rnd_f2 (rnd_g2 x) = x.
-axiom g_f_inv_2 : forall (x: elem), rnd_g2 (rnd_f2 x) = x.
-axiom f_g_inv_1 : forall (x: elem), rnd_f1 (rnd_g1 x) = x.
-axiom g_f_inv_1 : forall (x: elem), rnd_g1 (rnd_f1 x) = x.
-axiom f_g_inv_0 : forall (x: elem), rnd_f0 (rnd_g0 x) = x.
-axiom g_f_inv_0 : forall (x: elem), rnd_g0 (rnd_f0 x) = x.
+axiom f_g_inv : forall (x: elem), rnd_f (rnd_g x) = x.
+axiom g_f_inv : forall (x: elem), rnd_g (rnd_f x) = x.
 
 (* Prove the sharing scheme is secure.
    For all parties, view looks random.
@@ -442,23 +430,19 @@ lemma share_secure(p : party) :
 proof.
 proc.
 wp.
-rnd{2}.
-rnd rnd_f2 rnd_g2.
-rnd.
-rnd.
+seq 0 1 : (0 <= p < N).
+rnd{2}; auto.
+rnd (fun u => x{1} - s0{2} - s1{2} - u).
 auto.
 rewrite _4p.
 progress.
-by rewrite f_g_inv_2.
-smt(randelem1E).
-smt(randelem_full).
-by rewrite g_f_inv_2.
-smt(randelem_ll).
+admit.
+admit.
 (* views are equal *)
 rewrite /view /row.
 rewrite 2!cols_offunm lez_maxr //.
 rewrite eq_vectorP.
-rewrite 2!size_offunv lez_maxr // /=.
+rewrite 2!size_offunv lez_maxr //=.
 move => sh.
 elim => shgt0 shlt4.
 rewrite get_offunv // get_offunv //.
@@ -470,35 +454,21 @@ rewrite rows_offunm lez_maxr // cols_offunm lez_maxr //.
 rewrite get_offunm.
 rewrite rows_offunm lez_maxr // cols_offunm lez_maxr //.
 progress.
-have size4 : size [s0L; s1L; s2L; zero] = 4 by trivial.
+have size4 : size [s0{1}; s1{1}; s2{1}; zero] = 4 by trivial.
 (* trivial when p = sh => view on diagonal, so zero *)
 case (p = sh) => [// | off_diag].
-(* off diagonal: shares are indistinguishable *)
+(* off diagonal: views are indistinguishable *)
 rewrite nth_put.
 rewrite size4 //.
 (* bottom-left side of diagonal: p is looking at a truly random element *)
-(*
 case (sh < p) => [shltp | shgteqp].
 case (sh = 0) => [// | shn0].
 case (sh = 1) => [// | shn1].
 case (sh = 2) => [sh2 | shn2].
-rewrite sh2 /=.
-
-rewrite H5.
-rewrite H7.
-
-(* sh >= p *)
-case (sh = 0) => [sh0 | shn0].
-rewrite sh0 /=.
-admit.
-case (sh = 1) => [sh1 | shn1].
-rewrite sh1 /=.
-admit.
-case (sh = 2) => [sh2 | shn2].
-rewrite sh2 /=.
+rewrite sh2 //=.
 admit.
 have sh3 : sh = 3 by smt().
-rewrite sh3 /=.
+rewrite sh3 //=.
 rewrite sum_four.
 rewrite size4 //.
 simplify.

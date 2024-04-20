@@ -12,8 +12,11 @@ import Zmod.Sub.
 import Zmod.ZModule.
 import Zmod.ComRing.*)
 
-require (*---*) DynMatrix.
+import Zmod.Sub.
+import Zmod.ZModule.
 
+require (*---*) DynMatrix.
+(*
 
 clone DynMatrix as Mat_A with
 type ZR.t <- Zmod.zmod,
@@ -42,8 +45,8 @@ ZR.unitout by exact Zmod.ZModpRing.unitout,
 ZR.expr0 by exact Zmod.ZModpRing.expr0,
 ZR.exprS by exact Zmod.ZModpRing.exprS,
 ZR.exprN by exact Zmod.ZModpRing.exprN.
+*)
 
-(*
 clone DynMatrix as Mat_A with
 type ZR.t <- Zmod.zmod,
 op ZR.zeror  <- Zmod.zero,
@@ -61,7 +64,7 @@ ZR.mulrA by exact Zmod.ZModpRing.mulrA,
 ZR.mulrC by exact Zmod.ZModpRing.mulrC,
 ZR.mul1r by exact Zmod.ZModpRing.mul1r,
 ZR.mulrDl by exact Zmod.ZModpRing.mulrDl.
-*)
+
 
 
 type party = int.
@@ -105,28 +108,17 @@ op open(m : matrix) =
     m.[0, 1] + m.[0, 2] + m.[0, 3] + m.[1, 0].
 
 
-lemma add_rearrange1(t1 t2 t3 t4 t5 t6 t7 t8 :Zmod.zmod) :
-   t1 + t2 + (t3 + t4) + (t5 + t6) + (t7 + t8) =
-  t1 + t3 + t5 + t7 + (t2 + t4 + t6 + t8).
-proof.
-apply/asint_inj. 
-rewrite !addE.  
-rewrite !modzDml.
-rewrite /asint.
-admit.
-qed.
-
-
-
 lemma open_linear(mx my : matrix):
     open (mx + my) = open mx + open my.
 proof.
-progress.
 rewrite /open.
 rewrite 4!get_addm.
-rewrite add_rearrange1.
-trivial.
+rewrite !addrA.
+smt(addrC addrA).
 qed.
+
+
+
 
 op valid(m : matrix) =
    (* matrix is NxN *)

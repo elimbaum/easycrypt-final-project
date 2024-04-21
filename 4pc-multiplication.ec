@@ -352,28 +352,28 @@ proof.
 by rewrite addS -addrA addrC addNr add0r.
 qed.
 
-lemma negswap (x y : zmod) :
-    -x = y <=> x = -y.
-proof.
-admit.
-qed.
-
 lemma negneg (x : zmod) :
     - -x = x.
 proof.
-by rewrite negswap.
+apply asint_inj.
+rewrite !inzmodK modzNm.
+have -> : forall (y : int), -(-y) = y.
+smt().
+rewrite pmod_small.
+rewrite rg_asint.
+trivial.
+qed.
+
+lemma negswap (x y : zmod) :
+    -x = y <=> x = -y.
+proof.
+split; progress; by rewrite negneg.
 qed.
 
 lemma subnegK (a b : zmod) :
     a - (-b) = a + b.
 proof.
 by rewrite negneg.
-qed.
-
-lemma cancel_sub_left(a b c : zmod) :
-    a - b = a - c <=> b = c.
-proof.
-admit.
 qed.
 
 lemma subrr (x : zmod) :
@@ -385,13 +385,17 @@ qed.
 lemma subdist (a b c : zmod):
     a - (b + c) = a + (-b) + (-c).
 proof.
-admit.
+rewrite addS.
+rewrite !addrA.
+rewrite (addrC (b + c + a)).
+rewrite !addrA addNr add0r.
+by rewrite addrC addrA addNr add0r.
 qed.
 
 lemma negdist (a b : zmod) :
     -(a + b) = (-a) + (-b).
 proof.
-admit.
+by rewrite -addS negneg addrC subdist subrr add0r.
 qed.
 
 

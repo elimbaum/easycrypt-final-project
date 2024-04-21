@@ -157,7 +157,7 @@ op view(m : matrix, p : party) =
 
 
 module Sim = {
-  (* simulator ignores x and p and just returns a random sharing
+  (* simulator ignores x and just returns a random sharing
      we will argue that all rows of the matrix (parties' views)
      are indistinguishable. *)
   proc share(x : elem) : matrix = {
@@ -165,10 +165,10 @@ module Sim = {
     var shares : elem list;
 
     (* generate random *)
-    s3 <$ randelem;
     s0 <$ randelem;
     s1 <$ randelem;
     s2 <$ randelem;
+    s3 <$ randelem;
 
     shares <- [s0; s1; s2; s3];
 
@@ -202,11 +202,9 @@ module F4 = {
     s0 <$ randelem;
     s1 <$ randelem;
     s2 <$ randelem;
-    shares <- [s0; s1; s2; zero];
 
     (* set last share such that the new sum equals x *)
-    s_ <- x - sumz_elem(shares);
-    shares <- put shares 3 s_;
+    shares <- [s0; s1; s2; x - (s0 + s1 + s2)];
 
     (* TODO: basically every `offunm` call is going to have the structure
         if p_ = s then 0 else ...
@@ -359,24 +357,46 @@ smt()
 qed.
 *)
 
+lemma subC (a b : zmod) :
+    a - b = -b + a.
+proof.
+smt(addrA).
+qed.
+
+lemma subrr (x : zmod) :
+    x - x = zero.
+proof.
+smt(addNr).
+qed.
+
+lemma negdist (a b c : zmod):
+    a - (b + c) = a - b - c.
+proof.
+admit.
+qed.
+
+lemma add_cleanup (a b c x : zmod) :
+    x = a + b + c + x - b - c - a.
+proof.
+admit.
+qed.
+
 
 (* Prove correctness of the sharing scheme. *)
 lemma share_correct(x_ : elem) :
     hoare[F4.share: x = x_ ==> valid res /\ open res = x_].
 proof.
 proc.
-seq 4 : (x = x_ /\ size shares = N /\ shares = [s0; s1; s2; zero]).
+seq 4 : (x = x_ /\ size shares = N /\ sumz_elem shares = x).
 auto.
 progress.
 by rewrite _4p.
-seq 2 : (x = x_ /\ size shares = N /\ sumz_elem shares = x).
-auto; progress.
-rewrite _4p // size_put //.
-rewrite sum_four.
-rewrite size_put //.
-rewrite nth_put // nth_put // nth_put // nth_put // /=.
-rewrite sum_four // /=.
-smt(addrC addrA addNr add0r).
+rewrite sum_four //=.
+rewrite addrA.
+rewrite (addrC (s00 + s10 + s20) x{hr}).
+rewrite -addrA.
+rewrite (subrr (s00 + s10 + s20)).
+smt(addrC add0r).
 (* valid *)
 auto.
 rewrite _4p.
@@ -413,80 +433,154 @@ rewrite (sum_four shares{hr}) //.
 smt(addrC addrA addNr add0r).
 qed.
 
-op rnd_f : elem -> elem.
-op rnd_g : elem -> elem.
+lemma addS (a b c : zmod) :
+    a - b = c <=> a = b + c.
+proof.
+smt(addrA addrC addNr add0r).
+qed.
 
-axiom f_g_inv : forall (x: elem), rnd_f (rnd_g x) = x.
-axiom g_f_inv : forall (x: elem), rnd_g (rnd_f x) = x.
+lemma subK (a b : zmod) :
+  a - (a - b) = b.
+proof.
+by rewrite addS -addrA addrC addNr add0r.
+qed.
+
+lemma subnegK (a b : zmod) :
+    a - (-b) = a + b.
+proof.
+admit.
+qed.
+
+lemma cancel_sub_left(a b c : zmod) :
+    a - b = a - c <=> b = c.
+proof.
+admit.
+qed.
+
+op rnd_f : zmod -> zmod.
+axiom rnd_f_inv : forall x, rnd_f (rnd_f x) = x.
 
 (* Prove the sharing scheme is secure.
    For all parties, view looks random.
  *)
 lemma share_secure(p : party) :
     equiv[F4.share ~ Sim.share :
-      0 <= p < N       
+      ={x} /\ 0 <= p < N       
       ==>
       view res{1} p = view res{2} p].
 proof.
 proc.
 wp.
-seq 0 1 : (0 <= p < N).
-rnd{2}; auto.
-rnd (fun u => x{1} - s0{2} - s1{2} - u).
+(*** party 3 ***) 
+(* easy: all random in both cases *)
+case (p = 3).
+seq 3 3 : (={s0, s1, s2} /\ p = 3); auto; progress.
+(* unpack the views *)
+rewrite _4p /view /row 2!cols_offunm lez_maxr // eq_vectorP 2!size_offunv //=.
+move => sh [shgt0 shlt4].
+(* extract matrix *)
+rewrite !get_offunv //=.
+rewrite !get_offunm.
+rewrite rows_offunm cols_offunm //.
+rewrite rows_offunm cols_offunm //.
+simplify.
+case (sh = 0) => [// | shn0].
+case (sh = 1) => [// | shn1].
+case (sh = 2) => [// | /#].
+(* other parties. last share is technically non-random but still looks it. *)
+(*** party 2 ***)
+case (p = 2).
+seq 2 2 : (={x, s0, s1} /\ p = 2).
+auto.
+seq 0 1 : (={x, s0, s1} /\ p = 2).
+auto.
+rnd (fun u => x{1} - (s0{1} + s1{1} + u)).
 auto.
 rewrite _4p.
 progress.
+rewrite !addrA.
+rewrite !negdist.
+rewrite subnegK.
 admit.
+rewrite !negdist.
+rewrite subnegK.
 admit.
-(* views are equal *)
-rewrite /view /row.
-rewrite 2!cols_offunm lez_maxr //.
-rewrite eq_vectorP.
-rewrite 2!size_offunv lez_maxr //=.
-move => sh.
-elim => shgt0 shlt4.
-rewrite get_offunv // get_offunv //.
-(* evaluate function calls *)
+(* non-trivial views are equal *)
+rewrite /view /row 2!cols_offunm lez_maxr // eq_vectorP 2!size_offunv //=.
+move => sh [shgt0 shlt4].
+(* extract matrix *)
+rewrite !get_offunv //=.
+rewrite !get_offunm.
+rewrite rows_offunm cols_offunm /#.
+rewrite rows_offunm cols_offunm /#.
 simplify.
-(* convert back to matrix *)
-rewrite get_offunm.
-rewrite rows_offunm lez_maxr // cols_offunm lez_maxr //.
-rewrite get_offunm.
-rewrite rows_offunm lez_maxr // cols_offunm lez_maxr //.
-progress.
-have size4 : size [s0{1}; s1{1}; s2{1}; zero] = 4 by trivial.
-(* trivial when p = sh => view on diagonal, so zero *)
-case (p = sh) => [// | off_diag].
-(* off diagonal: views are indistinguishable *)
-rewrite nth_put.
-rewrite size4 //.
-(* bottom-left side of diagonal: p is looking at a truly random element *)
-case (sh < p) => [shltp | shgteqp].
 case (sh = 0) => [// | shn0].
 case (sh = 1) => [// | shn1].
 case (sh = 2) => [sh2 | shn2].
 rewrite sh2 //=.
-admit.
 have sh3 : sh = 3 by smt().
 rewrite sh3 //=.
-rewrite sum_four.
-rewrite size4 //.
-simplify.
 
-rewrite nth_put // /=.
-rewrite sum_four.
-rewrite size4 //.
+(*** party 1 ***)
+case (p = 1).
+seq 1 1 : (={x, s0} /\ p = 1).
+auto.
+(* THIS IS THE TICKET! *)
+swap{1} 1.
+seq 0 1 : (={x, s0} /\ p = 1).
+auto.
+seq 1 1 : (={x, s0, s2} /\ p = 1).
+auto.
+rnd (fun u => x{1} - s0{1} - s2{1} - u).
+auto.
+rewrite _4p.
+progress.
+by rewrite subK.
+by rewrite subK.
+(* non-trivial views are equal *)
+rewrite /view /row 2!cols_offunm lez_maxr // eq_vectorP 2!size_offunv //=.
+move => sh [shgt0 shlt4].
+(* extract matrix *)
+rewrite !get_offunv //=.
+rewrite !get_offunm.
+rewrite rows_offunm cols_offunm /#.
+rewrite rows_offunm cols_offunm /#.
 simplify.
-have xeq : x{1} = x{2}.
-admit.
-rewrite xeq /=.
-smt().
-have s3s3 : s3{1} = s3L.
-admit.
-rewrite s3s3.
-smt().
-*)
-admit.
+case (sh = 0) => [// | shn0].
+case (sh = 1) => [// | shn1].
+case (sh = 2) => [// | shn2].
+have sh3 : sh = 3 by smt().
+rewrite sh3 //=.
+rewrite 2!negdist.
+smt(addrA).
+
+(*** party 0 ***)
+swap 1 2.
+seq 2 2 : (={x, s1, s2} /\ p = 0).
+auto.
+rewrite _4p /#.
+seq 0 1 : (={x, s1, s2} /\ p = 0).
+auto.
+rnd (fun u => x{1} - s1{1} - s2{1} - u).
+auto.
+rewrite _4p.
+progress.
+by rewrite subK.
+by rewrite subK.
+rewrite /view /row 2!cols_offunm lez_maxr // eq_vectorP 2!size_offunv //=.
+move => sh [shgt0 shlt4].
+rewrite !get_offunv //=.
+rewrite !get_offunm.
+rewrite rows_offunm cols_offunm /#.
+rewrite rows_offunm cols_offunm /#.
+case (sh = 0) => [// | shn0].
+case (sh = 1) => [// | shn1].
+case (sh = 2) => [// | shn2].
+have sh3 : sh = 3 by smt().
+rewrite sh3 //=.
+rewrite 2!negdist.
+rewrite !addS !addrA.
+by rewrite -add_cleanup.
 qed.
 
 (* Prove addition is correct *)
@@ -577,7 +671,6 @@ wp.
 seq 0 2 : (0 <= pi < N /\ 0 <= pj < N).
 auto.
 progress.
-rewrite randelem_ll.
 admit.
 qed.
 
@@ -863,6 +956,7 @@ rewrite 17!addrA.
 rewrite add_rearrange. 
 by simplify.
 *)
+
 admit.
 (* done correctness... now validity proof *)
 (* 1. prove size correct (N x N) *)

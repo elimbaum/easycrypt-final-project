@@ -1,5 +1,5 @@
 prover quorum=2 ["Alt-Ergo" "Z3"].
-timeout 1.  (* limit SMT solvers to two seconds *)
+timeout 2.  (* limit SMT solvers to two seconds *)
 require import AllCore FSet List Distr.
 require import Bool IntDiv.
 require import Number StdOrder.
@@ -334,33 +334,46 @@ rewrite T4 T3 T2 T1 take0.
 smt(addrA addrC add0r).
 qed.
 
-(*
-(* replacing zero value in list with `x` increases the sum by `x` *)
-lemma sum_replacement(shares : elem list, i: int, x, y: elem) :
-    0 <= i < size shares /\ size shares = N /\ nth err shares i = y  => 
-    sumz_elem (put shares i x) = x - y + sumz_elem shares.
-proof.
-progress.
-rewrite _4p in H1.
-rewrite (sum_four shares) //.
-rewrite (sum_four (put shares i x)).
-by rewrite size_put.
-rewrite nth_put.
-smt().
-rewrite nth_put.
-smt().
-rewrite nth_put.
-smt().
-rewrite nth_put.
-smt().
-smt()
-qed.
-*)
-
 lemma subC (a b : zmod) :
     a - b = -b + a.
 proof.
 smt(addrA).
+qed.
+
+lemma addS (a b c : zmod) :
+    a - b = c <=> a = b + c.
+proof.
+smt(addrA addrC addNr add0r).
+qed.
+
+lemma subK (a b : zmod) :
+  a - (a - b) = b.
+proof.
+by rewrite addS -addrA addrC addNr add0r.
+qed.
+
+lemma negswap (x y : zmod) :
+    -x = y <=> x = -y.
+proof.
+admit.
+qed.
+
+lemma negneg (x : zmod) :
+    - -x = x.
+proof.
+by rewrite negswap.
+qed.
+
+lemma subnegK (a b : zmod) :
+    a - (-b) = a + b.
+proof.
+by rewrite negneg.
+qed.
+
+lemma cancel_sub_left(a b c : zmod) :
+    a - b = a - c <=> b = c.
+proof.
+admit.
 qed.
 
 lemma subrr (x : zmod) :
@@ -369,14 +382,14 @@ proof.
 smt(addNr).
 qed.
 
-lemma negdist (a b c : zmod):
-    a - (b + c) = a - b - c.
+lemma subdist (a b c : zmod):
+    a - (b + c) = a + (-b) + (-c).
 proof.
 admit.
 qed.
 
-lemma add_cleanup (a b c x : zmod) :
-    x = a + b + c + x - b - c - a.
+lemma negdist (a b : zmod) :
+    -(a + b) = (-a) + (-b).
 proof.
 admit.
 qed.
@@ -433,32 +446,34 @@ rewrite (sum_four shares{hr}) //.
 smt(addrC addrA addNr add0r).
 qed.
 
-lemma addS (a b c : zmod) :
-    a - b = c <=> a = b + c.
+lemma simplify_share_secure_1 (x s0 s1 s3 : zmod):
+    x - (s0 + s1 + (x - (s0 + s1 + s3))) = s3.
 proof.
-smt(addrA addrC addNr add0r).
+rewrite !subdist.
+rewrite negneg.
+rewrite (addrC (x - s0 - s1)).
+rewrite !addrA.
+rewrite addNr.
+rewrite add0r.
+rewrite (addrC (-s0 - s1)).
+rewrite !addrA.
+rewrite subrr.
+rewrite add0r.
+rewrite addNr.
+by rewrite add0r.
 qed.
 
-lemma subK (a b : zmod) :
-  a - (a - b) = b.
+lemma add_cleanup (a b c x : zmod) :
+    x = a + b + c + x - b - c - a.
 proof.
-by rewrite addS -addrA addrC addNr add0r.
+rewrite (addrC (a + b + c + x - b - c)).
+rewrite !addrA addNr add0r.
+rewrite (addrC (b + c + x)).
+rewrite !addrA addNr add0r.
+rewrite addrC.
+by rewrite !addrA addNr add0r.
 qed.
 
-lemma subnegK (a b : zmod) :
-    a - (-b) = a + b.
-proof.
-admit.
-qed.
-
-lemma cancel_sub_left(a b c : zmod) :
-    a - b = a - c <=> b = c.
-proof.
-admit.
-qed.
-
-op rnd_f : zmod -> zmod.
-axiom rnd_f_inv : forall x, rnd_f (rnd_f x) = x.
 
 (* Prove the sharing scheme is secure.
    For all parties, view looks random.
@@ -498,13 +513,8 @@ rnd (fun u => x{1} - (s0{1} + s1{1} + u)).
 auto.
 rewrite _4p.
 progress.
-rewrite !addrA.
-rewrite !negdist.
-rewrite subnegK.
-admit.
-rewrite !negdist.
-rewrite subnegK.
-admit.
+by rewrite simplify_share_secure_1.
+by rewrite simplify_share_secure_1.
 (* non-trivial views are equal *)
 rewrite /view /row 2!cols_offunm lez_maxr // eq_vectorP 2!size_offunv //=.
 move => sh [shgt0 shlt4].
@@ -551,7 +561,7 @@ case (sh = 1) => [// | shn1].
 case (sh = 2) => [// | shn2].
 have sh3 : sh = 3 by smt().
 rewrite sh3 //=.
-rewrite 2!negdist.
+rewrite 2!subdist.
 smt(addrA).
 
 (*** party 0 ***)
@@ -578,7 +588,7 @@ case (sh = 1) => [// | shn1].
 case (sh = 2) => [// | shn2].
 have sh3 : sh = 3 by smt().
 rewrite sh3 //=.
-rewrite 2!negdist.
+rewrite 2!subdist.
 rewrite !addS !addrA.
 by rewrite -add_cleanup.
 qed.

@@ -105,25 +105,6 @@ axiom _enz : err <> zero.
 (* Calculate sum of elems in list of elems *)
 op sumz_elem (sz : elem list) = foldr Zmod.(+) zero sz.
 
-(* UNUSED LEMMAS
-lemma addS (a b c : zmod) :
-    a + b = c <=> b = c - a.
-proof.
-smt(addrC addrA addNr add0r).
-qed.
-
-lemma addK(a b c : zmod) :
-    b = c <=> a + b = a + c.
-proof.
-split.
-smt(addrC addrA).
-progress.
-rewrite -{1}add0r.
-rewrite -(addNr a).
-smt(addrC addrA addNr add0r).
-qed.
-*)
-
 op open(m : matrix) =
     (* consistency check? or precondition? *)
     (* add up party 0 shares, then add P1's x0... make this nicer? *)
@@ -176,15 +157,12 @@ module Sim = {
         if p_ = s then zero else (nth err shares s)), N, N);
   }
 
-  proc add(x y : int, i j : party) : matrix = {
+  proc add(x y : elem) : matrix = {
     var mx, my : matrix;
-    var rx, ry : elem;
 
-    rx <$ randelem;
-    ry <$ randelem;
-
-    mx <@ share(rx);
-    my <@ share(ry);
+    (* these will be simulated random matrices *)
+    mx <@ share(x);
+    my <@ share(y);
     return mx + my;
   }
 }.
@@ -291,12 +269,10 @@ module F4 = {
   }
 
 
-  proc add_main(x y : elem, i j : party) : matrix = {
+  proc add_main(x y : elem) : matrix = {
     var mx, my, mz : matrix;
 
-    (* party i has x *)
     mx <@ share(x);
-    (* party j has y *)
     my <@ share(y);
 
     (* addition is local *)
@@ -486,7 +462,7 @@ lemma share_secure(p : party) :
     equiv[F4.share ~ Sim.share :
       ={x} /\ 0 <= p < N       
       ==>
-      view res{1} p = view res{2} p].
+      size res{1} = (N, N) /\ size res{2} = (N, N) /\ view res{1} p = view res{2} p].
 proof.
 proc.
 wp.
@@ -495,6 +471,10 @@ wp.
 case (p = 3).
 seq 3 3 : (={s0, s1, s2} /\ p = 3); auto; progress.
 (* unpack the views *)
+by rewrite _4p.
+by rewrite _4p.
+by rewrite _4p.
+by rewrite _4p.
 rewrite _4p /view /row 2!cols_offunm lez_maxr // eq_vectorP 2!size_offunv //=.
 move => sh [shgt0 shlt4].
 (* extract matrix *)
@@ -598,29 +578,26 @@ by rewrite -add_cleanup.
 qed.
 
 (* Prove addition is correct *)
-lemma add_correct(x_ y_ : elem, pi pj : party) :
-    hoare[F4.add_main : x = x_ /\ y = y_ /\ i = pi /\ j = pj /\ 0 <= pi < N /\ 0 <= pj < N
+lemma add_correct(x_ y_ : elem) :
+    hoare[F4.add_main : x = x_ /\ y = y_
       ==> valid res /\ open res = x_ + y_].
 proof.
 proc.
-have n4 : N = 4 by rewrite _4p.
-
-seq 1 : (open mx = x_ /\ y = y_ /\ size mx = (N, N) /\ valid mx /\ j{hr} = pj /\ 0 <= pj < N).
-
+seq 1 : (open mx = x_ /\ y = y_ /\ size mx = (N, N) /\ valid mx).
 auto.
 call (share_correct x_).
 auto => />; progress; smt().
-
 seq 1 : (open mx = x_ /\ size mx = (N, N) /\ valid mx /\
          open my = y_ /\ size my = (N, N) /\ valid my).
 call (share_correct y_).
 (*Validity proof*)
-auto => />; progress; smt().
-wp.
 auto.
-
-(*Validity proof*)
+rewrite _4p.
+progress; smt().
+wp.
 auto => />.
+(*Validity proof*)
+rewrite _4p.
 move => &hr rows_mx cols_mx _ _ diag_mx not_diag_mx_left not_diag_mx_right rows_my cols_my _ _ diag_my not_diag_my_left not_diag_my_right.
 progress.
 rewrite rows_addm rows_mx rows_my /#.
@@ -628,10 +605,12 @@ rewrite cols_addm cols_mx cols_my /#.
 rewrite get_addm.
 rewrite diag_mx.
 
+have alt4 : a < 4.
+move : H0.
+by rewrite rows_addm rows_mx rows_my.
+
 progress.
-rewrite rows_addm in H0.
 smt().
-rewrite cols_addm in H1.
 smt().
 smt(add0r).
 
@@ -674,18 +653,36 @@ smt().
 by rewrite open_linear.
 qed.
 
-lemma add_secure(pi pj : party) :
+lemma view_linear(x y : matrix, p : party) :
+    size x = size y => view (x + y) p = view x p + view y p.
+proof.
+progress.
+rewrite /view /row cols_offunm lez_maxr.
+rewrite /max.
+case (cols x < cols y); by rewrite cols_ge0.
+rewrite eq_vectorP //.
+progress.
+rewrite size_addv !size_offunv //=.
+smt().
+rewrite get_addv !get_offunv //=.
+smt().
+smt().
+smt().
+by rewrite get_addm.
+qed.
+
+lemma add_secure(p : party) :
     equiv[F4.add_main ~ Sim.add :
-      0 <= pi < N /\ 0 <= pj < N
+      ={x, y} /\ 0 <= p < N
       ==>
-      view res{1} pi = view res{2} pi \/ view res{1} pj = view res{2} pj].
+      view res{1} p = view res{2} p].
 proof.
 proc.
 wp.
-seq 0 2 : (0 <= pi < N /\ 0 <= pj < N).
-auto.
-progress.
-admit.
+call (share_secure p).
+call (share_secure p).
+auto; progress.
+rewrite !view_linear //=; smt().
 qed.
 
 (*
@@ -751,6 +748,8 @@ case: (0 = g{hr}).
 progress.
 smt(add0r addrC).
 qed.
+
+
 
 (* Prove correctness of inp. *)
 lemma inp_correct(x_ : elem, i_ j_ g_ h_: party) :

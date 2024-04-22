@@ -469,13 +469,10 @@ wp.
 (*** party 3 ***) 
 (* easy: all random in both cases *)
 case (p = 3).
-seq 3 3 : (={s0, s1, s2} /\ p = 3); auto; progress.
-(* unpack the views *)
-by rewrite _4p.
-by rewrite _4p.
-by rewrite _4p.
-by rewrite _4p.
-rewrite _4p /view /row 2!cols_offunm lez_maxr // eq_vectorP 2!size_offunv //=.
+seq 3 3 : (={s0, s1, s2} /\ p = 3); auto. 
+rewrite _4p.
+progress.
+rewrite /view /row 2!cols_offunm lez_maxr // eq_vectorP 2!size_offunv //=.
 move => sh [shgt0 shlt4].
 (* extract matrix *)
 rewrite !get_offunv //=.

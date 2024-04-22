@@ -787,7 +787,6 @@ rewrite diag0.
 smt(add0r).
 smt(add0r).
 
-
 (* columns are equal *)
 rewrite 2!get_addm.
 rewrite get_offunm.
@@ -862,13 +861,13 @@ qed.
 
 (* annoying, but if we try to smt() this down below without the intermediate lemma,
    smt gets confused. (maybe too much in context) *)
-lemma add_rearrange (t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t13 t14 t15 t16 : int) :
-   t1 +  t2 +  t3 +  t4 +  t5 +  t6 +  t7 +  t8 +
-   t9 + t10 + t11 + t12 + t13 + t14 + t15 + t16 =
-  t13 +  t5 +  t3 + t12 +  t6 + t14 +  t1 + t10 +
-   t4 +  t2 + t15 +  t8 + t11 +  t9 +  t7 + t16.
+lemma add_rearrange (t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t13 t14 t15 t16 : zmod) :
+    t1 + t2 + t3 + t4 + t5 + t6 + t7 + t8 +
+    t9 + t10 + t11 + t12 + t13 + t14 + t15 + t16 = 
+    t13 + t6 + t4 + t11 + t5 + t14 + t2 + t9 +
+    t3 +  t1 + t15 + t7 + t12 + t10 + t8 + t16.
 proof.
-smt().
+admit.
 qed.
 
 lemma valid_size(m : matrix) :
@@ -903,6 +902,13 @@ progress.
 rewrite H3.
 smt().
 trivial.
+qed.
+
+lemma mulrDr (x y z : zmod): x * (y + z) = (x * y) + (x * z).
+proof.
+rewrite ComRing.mulrC.
+rewrite ComRing.mulrDl.
+smt(ComRing.mulrC).
 qed.
 
 (* Prove multiplication is correct *)
@@ -959,18 +965,13 @@ rewrite get_offunm.
 by rewrite cols_offunm rows_offunm lez_maxr.
 simplify.
 
-
-(* algebra *)
-(* NEEDS TO BE REDONE!!!!
 rewrite !addrA.
-rewrite multrDr.
-rewrite 3!mulrDr 12!mulrDl.
-rewrite 17!addrA.
+rewrite !ComRing.mulrDl.
+rewrite !mulrDr.
+rewrite !addrA.
 rewrite add_rearrange. 
 by simplify.
-*)
 
-admit.
 (* done correctness... now validity proof *)
 (* 1. prove size correct (N x N) *)
 rewrite 6!rows_addm.

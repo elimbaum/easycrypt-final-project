@@ -133,6 +133,35 @@ op valid(m : matrix) =
           (* for all other shares, equal to party 0's *)
            m.[p, s] = m.[0, s]).
 
+(* oops. this might be backwards from what we need. *)
+lemma valid_linear (x y : matrix) :
+    valid x /\ valid y => valid (x + y).
+proof.
+rewrite /valid _4p.
+progress.
+rewrite rows_addm /#.
+rewrite cols_addm /#.
+have alt4 : a < 4.
+move : H10.
+rewrite rows_addm /#.
+rewrite get_addm.
+rewrite H1; first by smt().
+rewrite H6; first by smt().
+by rewrite add0r.
+have plt4 : p < 4.
+rewrite rows_addm in H10; smt().
+rewrite !get_addm.
+rewrite H2; first by smt().
+rewrite H7; first by smt().
+trivial.
+have pslt4 : p < 4 /\ s < 4.
+move : H10 H12. rewrite rows_addm cols_addm; smt().
+rewrite !get_addm.
+rewrite H3; first by smt().
+rewrite H8; first by smt().
+trivial.
+qed.
+
 op view(m : matrix, p : party) =
   row m p.
 
@@ -157,9 +186,10 @@ module Sim = {
         if p_ = s then zero else (nth err shares s)), N, N);
   }
 
-   proc jmp(x : elem, si sj d g  :party) : matrix = {
+   proc jmp(x : elem, si sj d g : party) : matrix = {
     (* TODO: party d gets x from si, and H(x) from sj *)
     (* abort if hashes don't check out *)
+    (* QUESTION: what, if anything, should the simulator do here? *)
     var mjmp : matrix;
 
     mjmp <- offunm ((fun p s =>
@@ -183,7 +213,7 @@ module Sim = {
 
     minp <- pgm + offunm ((fun p s => 
       if s = p then zero else
-      if s = h then r else zero), N, N);
+      if s = g then r else zero), N, N);
     return minp;
   }
 
@@ -225,16 +255,23 @@ module F4 = {
   (* parties si and sj know x, and want to send it to party d.
      g is exlcuded.
      todo: cheating identification (vs just abort)
+     NOTE: this is NOT a secure functionality. just message passing.
 
+
+     matrix representation:
+      |. 0 0 x|     |. 0 0 x|    party i
+      |0 . 0 x| --> |0 . 0 x|    party h
+      |0 0 . ?|     |0 0 . x|    party g
+      |0 0 0 .|     |0 0 0 .|  ( party h)
    *)
-  proc jmp(x : elem, si sj d g  :party) : matrix = {
-    (* TODO: party d gets x from si, and H(x) from sj *)
+  proc jmp(x : elem, si sj g h : party) : matrix = {
+    (* TODO: party g gets x from si, and H(x) from sj *)
     (* abort if hashes don't check out *)
     var mjmp : matrix;
 
     mjmp <- offunm ((fun p s =>
         if p = s then zero else
-        if g = s then x else zero), N, N);
+        if h = s then x else zero), N, N);
     return mjmp;
   }
 
@@ -246,18 +283,20 @@ module F4 = {
     var pgm, minp : matrix;
 
     (* in the paper this is a PRF, but for now model as truly random
-       and just don't give it to party g. *)
+       and just don't give it to party g.
+       parties i, j, h generate r. *)
     r <$ randelem;
 
+    (* only parties i and j know BOTH x and r, so only parties i and j know xh *)
     xh <- x - r;
 
-    (* Pg learns xh *)
+    (* Use jmp to send xh from Pi, Pj to Pg *)
     pgm <@ jmp(xh, i, j, g, h);
 
-    (* xi = xj = 0, xg = r, xh = x - r *)
+    (* xi = xj = 0, xg = r, xh = x - r (within pgm) *)
     minp <- pgm + offunm ((fun p s => 
       if s = p then zero else
-      if s = h then r else zero), N, N);
+      if s = g then r else zero), N, N);
     return minp;
   }
 
@@ -411,6 +450,9 @@ proof.
 by rewrite subdist negneg subrr add0r.
 qed.
 
+(************************)
+(* SHARE ****************)
+(************************)
 
 (* Prove correctness of the sharing scheme. *)
 lemma share_correct(x_ : elem) :
@@ -490,14 +532,6 @@ rewrite !addrA addNr add0r.
 rewrite addrC.
 by rewrite !addrA addNr add0r.
 qed.
-
-
-
-
-
-
-
-
 
 (* Prove the sharing scheme is secure.
    For all parties, view looks random.
@@ -620,129 +654,259 @@ rewrite !addS !addrA.
 by rewrite -add_cleanup.
 qed.
 
+(************************)
+(* JMP ******************)
+(************************)
+
+(* Prove correctness of the jmp: joint message passing *)
+lemma jmp_correct(x_ : elem, si_ sj_ g_ h_ : party) :
+    hoare[F4.jmp : x = x_ /\ si = si_ /\ 
+      sj = sj_ /\ g = g_ /\ h = h_ /\ 0 <= g_ < N /\ 0 <= h_ < N
+      ==>
+      valid res /\ open res = x_].
+proof.
+proc.
+(*Proof for open*)
+auto.
+rewrite _4p.
+progress.
+rewrite rows_offunm _4p lez_maxr // /=.
+rewrite cols_offunm _4p lez_maxr //.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm /= lez_maxr //.
+by simplify.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm /= lez_maxr //.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm /= lez_maxr //.
+by rewrite /= H7 /=.
+
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm /= lez_maxr //.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm /= lez_maxr //.
+have H6p : 0 <> s by smt().
+by rewrite /= H7 H6p /=.
+rewrite /open.
+rewrite get_offunm.
+by rewrite rows_offunm cols_offunm => /=.
+rewrite get_offunm.
+by rewrite rows_offunm cols_offunm => /=.
+rewrite get_offunm.
+by rewrite rows_offunm cols_offunm => /=.
+rewrite get_offunm.
+by rewrite rows_offunm cols_offunm => /=.
+simplify.
+case (h{hr} = 3) => [//= | hn3].
+by smt(add0r).
+case (h{hr} = 2) => [//= | hn2].
+by smt(add0r).
+case (h{hr} = 1) => [// | hn1].
+by smt(addrC add0r).
+have -> : h{hr} = 0 by smt().
+smt(add0r addrC).
+qed.
 
 
+(************************)
+(* INP ******************)
+(************************)
 
+(* Prove correctness of inp: shared input *)
+lemma inp_correct(x_ : elem, i_ j_ g_ h_: party) :
+    hoare[F4.inp : x = x_ /\ i = i_ /\
+      j = j_ /\ h = h_ /\ g = g_ /\ 0 <= g_ < N /\ 0 <= h_ < N
+      ==>
+      valid res /\ open res = x_].
+proof.
+proc.
+(*Proof for open*)
+auto.
+seq 2 : (x = x_ /\ i = i_ /\ j = j_ /\ h = h_ /\ g = g_ /\ xh = x - r /\ 0 <= g_ < N /\ 0 <= h_ < N).
+auto.
+progress.
+exists* r.
+elim* => r_.
+call (jmp_correct (x_ - r_) i_ j_ g_ h_).
+auto => />.
+rewrite _4p.
+move => g0 g4 h0 h4 result rowsn colsn diag0 valid_s0 valid_snot0 openr.
+progress.
+(* first, inp output is valid. *)
+rewrite rows_addm rowsn rows_offunm /#.
+rewrite cols_addm colsn cols_offunm /#.
+have mrange_a : mrange result a a.
+  rewrite rowsn colsn.
+  move : H0.
+  rewrite rows_addm rowsn rows_offunm /#.
+rewrite get_addm.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm /#.
+simplify.
+rewrite diag0.
+smt(add0r).
+smt(add0r).
 
+(* columns are equal *)
+rewrite 2!get_addm.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm.
+rewrite /max.
+simplify.
+move: H0.
+rewrite rows_addm rowsn rows_offunm /#.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm /#.
+simplify.
+have resultp0_eq_result10: mrange result p 0 /\ p <> 0 /\ 0 = 0 => result.[p, 0] = result.[1, 0] by smt().
+rewrite resultp0_eq_result10.
+progress.
+move: H0.
+rewrite rows_addm rowsn rows_offunm /#.
+move: H1.
+rewrite cols_addm colsn cols_offunm /#.
+smt().
 
+rewrite 2!get_addm.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm.
+rewrite /max.
+simplify.
+progress.
+move: H0.
+rewrite rows_addm rowsn rows_offunm /#.
+move: H2.
+rewrite cols_offunm colsn cols_offunm /#.
+rewrite get_offunm.
+rewrite rows_offunm cols_offunm.
+rewrite /max.
+simplify.
+progress.
+move: H2.
+rewrite cols_offunm colsn cols_offunm /#.
+simplify.
+have resultps_eq_result0s: mrange result p s /\ p <> s /\ s <> 0 => result.[p, s] = result.[0, s].
+progress.
+smt().
 
+rewrite resultps_eq_result0s.
+progress.
+move: H0.
+rewrite rows_addm rowsn rows_offunm /#.
+move: H2.
+rewrite cols_offunm colsn cols_offunm /#.
+have s_noteq_p: s <> p by smt().
+rewrite H4 s_noteq_p /#.
+(* begin correctness proof *)
+
+rewrite open_linear.
+rewrite /open.
+rewrite get_offunm.
+rewrite cols_offunm rows_offunm /#.
+rewrite get_offunm.
+rewrite cols_offunm rows_offunm /#.
+rewrite get_offunm.
+rewrite cols_offunm rows_offunm /#.
+rewrite get_offunm.
+rewrite cols_offunm rows_offunm /#.
+simplify.
+case: (2 < g_).
+ by smt(addrC addrA addNr add0r).
+case: (1 < g_).
+ by smt(addrC addrA addNr add0r).
+case: (g_ = 0).
+ by smt(addrC addrA addNr add0r).
+smt(addrC addrA addNr add0r).
+qed.
+
+(* prove inp security:
+ * for the two receiving parties (g & h), the protocol and simulator
+ * are indistinguishable. we cannot include parties i and j in this
+ * security proof, since they already know the value of x. therefore,
+ * no simulator could generate a share matrix which would fool them.
+ *
+ * precondition is ugly, maybe could be cleaned up with FSet.
+ *)
 lemma inp_secure(p : party) :
     equiv[F4.inp ~ Sim.inp :
-      ={x,h,i,j,g} /\ 0 <= p < N /\ p <> i{1} /\ p <> j{1}
+    (* inputs are equal *)
+      ={x,h,i,j,g} /\
+        (* inputs are in [0, 4) *)
+        0 <= p < N /\ 0 <= i{1} < N /\ 0 <= j{1} < N /\ 0 <= g{1} < N /\ 0 <= h{1} < N /\
+        (* viewing party is not i or j *)
+        p <> i{1} /\ p <> j{1} /\
+        (* inputs are distinct *)
+        h{1} <> i{1} /\ h{1} <> j{1} /\ h{1} <> g{1} /\
+        i{1} <> j{1} /\ i{1} <> g{1} /\ j{1} <> g{1}
       ==>
       size res{1} = (N, N) /\ size res{2} = (N, N) /\ view res{1} p = view res{2} p].
 proof.
 proc.
-case: (h{1} <> p).
-seq 1 1: (={x, h, r} /\ 0 <= p < N  /\ p <> i{1} /\ p <> j{1}).
 auto.
-seq 1 1: (={x, h, r} /\ 0 <= p < N  /\ p <> i{1} /\ p <> j{1}).
+(* first case: viewing party is party h, which has share (0, 0, r) *)
+case (p = h{1}).
+(* r are the same *)
+seq 1 1 : (={x,h,i,j,g,r} /\ p = h{1} /\ h{1} <> g{1} /\ 0 <= p < N).
 auto.
-wp.
-inline*.
-wp.
+(* party h cannot see xh, so eat it *)
+seq 1 1 : (={x,h,i,j,g,r} /\ p = h{1} /\ h{1} <> g{1} /\ 0 <= p < N).
 auto.
+(* handle calls to jmp - same, but we can ignore xh, so value is unimportant *)
+auto.
+inline.
+auto.
+auto.
+rewrite _4p.
 progress.
-rewrite rows_offunm /max _4p /#.
-rewrite cols_offunm /max _4p /#.
-rewrite rows_offunm /max _4p /#.
-rewrite cols_offunm /max _4p /#.
-rewrite /view /row 2!cols_offunm lez_maxr //.
-rewrite /max _4p.
-simplify.
-rewrite /max //.
-rewrite /view /row 2!cols_offunm lez_maxr //.
-rewrite /max _4p.
-simplify.
-rewrite /max //.
-simplify.
-rewrite  eq_vectorP.
-rewrite !size_offunv.
-simplify.
-progress.
+rewrite /view /row !cols_offunm lez_maxr // eq_vectorP !size_offunv //=.
+rewrite !lez_maxr //.
+move => sh [shgt0 shlt4].
 rewrite !get_offunv //=.
-rewrite !get_offunm.
-rewrite rows_offunm cols_offunm.
+rewrite !get_offunm; first 2 rewrite rows_offunm cols_offunm //=.
 simplify.
-rewrite /max.
+rewrite !get_offunm; first 3 rewrite rows_offunm cols_offunm lez_maxr //.
 simplify.
-rewrite _4p in H0.
 smt().
 
-rewrite !rows_offunm !cols_offunm.
-rewrite !lez_maxr //.
-rewrite _4p in H0.
-
-smt().
+(* p <> h, so p = g *
+ * in this case, party g's share is (0, 0, xh := x - r)
+ * we can't introduce p = g yet but will do it later. *)
+seq 0 1 : (={x,h,i,j,g} /\
+  0 <= p < N /\ 0 <= i{1} < N /\ 0 <= j{1} < N /\ 0 <= g{1} < N /\ 0 <= h{1} < N /\
+  p <> i{1} /\ p <> j{1} /\ p <> h{1} /\
+  h{1} <> i{1} /\ h{1} <> j{1} /\ h{1} <> g{1} /\
+  i{1} <> j{1} /\ i{1} <> g{1} /\ j{1} <> g{1}).
+(* eat r on the right *)
+auto.
+seq 1 1 : (={x,h,i,j,g} /\ xh{2} = x{1} - r{1} /\
+  0 <= p < N /\ 0 <= i{1} < N /\ 0 <= j{1} < N /\ 0 <= g{1} < N /\ 0 <= h{1} < N /\
+  p <> i{1} /\ p <> j{1} /\ p <> h{1} /\
+  h{1} <> i{1} /\ h{1} <> j{1} /\ h{1} <> g{1} /\
+  i{1} <> j{1} /\ i{1} <> g{1} /\ j{1} <> g{1}).
+rnd (fun u => x{1} - u).
+auto.
+progress; first 2 by rewrite subK.
+sp.
+(* jmp call *)
+inline; auto.
+rewrite _4p.
+progress.
+have p_eq_g : p = g{2} by smt().
+rewrite /view /row !cols_offunm lez_maxr // eq_vectorP !size_offunv //=.
+move => sh [shgt0 shlt4].
+rewrite !get_offunv //= !get_offunm; first 2 rewrite rows_offunm cols_offunm //=.
 simplify.
-rewrite !get_offunm.
-rewrite rows_offunm cols_offunm.
-rewrite !lez_maxr //.
-rewrite _4p in H0.
-smt().
-
-
-rewrite rows_offunm cols_offunm.
-rewrite !lez_maxr //.
-rewrite _4p in H0.
-smt().
-
-rewrite rows_offunm cols_offunm.
-rewrite !lez_maxr //.
-rewrite _4p in H0.
-smt().
-
+rewrite !get_offunm; first 3 rewrite rows_offunm cols_offunm lez_maxr //=.
 simplify.
-
-
- /#.
-rewrite rows_offunm cols_offunm /#.
-rewrite rows_offunm cols_offunm /#.
-simplify.
-case (i0 = 3) => [// | ion3].
-rewrite eq_sym in ion3.
-rewrite ion3.
-simplify.
-admit.
-
-
+smt().
 qed.
 
 
-(*
-proc.
-seq 1 1: (={x,r, h} /\ 0 <= p < N ).
-auto.
-
-seq 1 1: (={x, r, h} /\ 0 <= p < N /\ xh{1} = x{1}-r{1}).
-
-wp.
-rnd
-rnd{2} (fun u => x{1} - u).
-auto.
 
 
-inline*.
-wp.
-auto.
-progress.
-rewrite rows_offunm /max _4p /#.
-rewrite cols_offunm /max _4p /#.
-rewrite rows_offunm /max _4p /#.
-rewrite cols_offunm /max _4p /#.
-qed.*)
-
-
-
-
-
-
-
-
-
-
-
-
+(************************)
+(* ADD ******************)
+(************************)
 
 
 (* Prove addition is correct *)
@@ -868,167 +1032,6 @@ qed.
 *)
 
 
-(* Prove correctness of the jmp. *)
-lemma jmp_correct(x_ : elem, si_ sj_ d_ g_: party) :
-    hoare[F4.jmp : x = x_ /\ si = si_ /\ 
-      sj = sj_ /\ d = d_ /\ g = g_ /\ 0 <= g_ < N
-      ==>
-      valid res /\ open res = x_].
-proof.
-proc.
-(*Proof for open*)
-auto.
-rewrite _4p.
-progress.
-rewrite rows_offunm _4p lez_maxr // /=.
-rewrite cols_offunm _4p lez_maxr //.
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm /= lez_maxr //.
-by simplify.
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm /= lez_maxr //.
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm /= lez_maxr //.
-by rewrite /= H5 /=.
-
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm /= lez_maxr //.
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm /= lez_maxr //.
-have H6p : 0 <> s by smt().
-by rewrite /= H5 H6p /=.
-rewrite /open.
-rewrite get_offunm.
-by rewrite rows_offunm cols_offunm => /=.
-rewrite get_offunm.
-by rewrite rows_offunm cols_offunm => /=.
-rewrite get_offunm.
-by rewrite rows_offunm cols_offunm => /=.
-rewrite get_offunm.
-by rewrite rows_offunm cols_offunm => /=.
-simplify.
-case: (2 < g{hr}).
- by smt(add0r).
-case: (1 < g{hr}).
- by smt(add0r).
-case: (0 = g{hr}).
- by smt(add0r).
-progress.
-smt(add0r addrC).
-qed.
-
-
-
-(* Prove correctness of inp. *)
-lemma inp_correct(x_ : elem, i_ j_ g_ h_: party) :
-    hoare[F4.inp : x = x_ /\ i = i_ /\
-      j = j_ /\ h = h_ /\ g = g_ /\ 0 <= h_ < N
-      ==>
-      valid res /\ open res = x_].
-proof.
-proc.
-(*Proof for open*)
-auto.
-seq 2 : (x = x_ /\ i = i_ /\ j = j_ /\ h = h_ /\ g = g_ /\ 
-  0 <= h_ < N /\ xh = x - r).
-auto.
-progress.
-exists* r.
-elim* => r_.
-call (jmp_correct (x_ - r_) i_ j_ g_ h_).
-auto => />.
-rewrite _4p.
-move => h0 hn result rowsn colsn diag0 valid_s0 valid_snot0 openr.
-progress.
-(* first, inp output is valid. *)
-rewrite rows_addm rowsn rows_offunm /#.
-rewrite cols_addm colsn cols_offunm /#.
-have mrange_a : mrange result a a.
-  rewrite rowsn colsn.
-  move : H0.
-  rewrite rows_addm rowsn rows_offunm /#.
-rewrite get_addm.
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm /#.
-simplify.
-rewrite diag0.
-smt(add0r).
-smt(add0r).
-
-(* columns are equal *)
-rewrite 2!get_addm.
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm.
-rewrite /max.
-simplify.
-move: H0.
-rewrite rows_addm rowsn rows_offunm /#.
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm /#.
-simplify.
-have resultp0_eq_result10: mrange result p 0 /\ p <> 0 /\ 0 = 0 => result.[p, 0] = result.[1, 0] by smt().
-rewrite resultp0_eq_result10.
-progress.
-move: H0.
-rewrite rows_addm rowsn rows_offunm /#.
-move: H1.
-rewrite cols_addm colsn cols_offunm /#.
-smt().
-
-rewrite 2!get_addm.
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm.
-rewrite /max.
-simplify.
-progress.
-move: H0.
-rewrite rows_addm rowsn rows_offunm /#.
-move: H2.
-rewrite cols_offunm colsn cols_offunm /#.
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm.
-rewrite /max.
-simplify.
-progress.
-move: H2.
-rewrite cols_offunm colsn cols_offunm /#.
-simplify.
-have resultps_eq_result0s: mrange result p s /\ p <> s /\ s <> 0 => result.[p, s] = result.[0, s].
-progress.
-smt().
-
-rewrite resultps_eq_result0s.
-progress.
-move: H0.
-rewrite rows_addm rowsn rows_offunm /#.
-move: H2.
-rewrite cols_offunm colsn cols_offunm /#.
-have s_noteq_p: s <> p by smt().
-rewrite H4 s_noteq_p /#.
-(* begin correctness proof *)
-
-rewrite open_linear.
-rewrite /open.
-rewrite get_offunm.
-rewrite cols_offunm rows_offunm /#.
-rewrite get_offunm.
-rewrite cols_offunm rows_offunm /#.
-rewrite get_offunm.
-rewrite cols_offunm rows_offunm /#.
-rewrite get_offunm.
-rewrite cols_offunm rows_offunm /#.
-simplify.
-case: (2 < h_).
- by smt(addrC addrA addNr add0r).
-case: (1 < h_).
- by smt(addrC addrA addNr add0r).
-case: (h_ = 0).
- by smt(addrC addrA addNr add0r).
-smt(addrC addrA addNr add0r).
-qed.
-
-
-
 (* annoying, but if we try to smt() this down below without the intermediate lemma,
    smt gets confused. (maybe too much in context) *)
 lemma add_rearrange (t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t13 t14 t15 t16 : zmod) :
@@ -1111,30 +1114,19 @@ call (inp_correct (mx.[0,3]*my.[1,0] + mx.[1,0]*my.[0,3]) 1 2 0 3).
 call (inp_correct (mx.[0,2]*my.[1,0] + mx.[1,0]*my.[0,2]) 1 3 0 2).
 call (inp_correct (mx.[0,1]*my.[1,0] + mx.[1,0]*my.[0,1]) 2 3 0 1).
 
-auto.
-progress.
-by rewrite _4p.
-by rewrite _4p.
-by rewrite _4p.
+auto; rewrite _4p. progress.
 
 (* prove two sides open to the same matrix *)
-
 rewrite 6!open_linear.
-
 (* results from INP *)
-rewrite H7 H10 H13 H16 H19 H22.
+rewrite H6 H8 H10 H12 H14 H16.
 (* local multiply result *)
-rewrite /open _4p.
-rewrite get_offunm.
-by rewrite cols_offunm rows_offunm lez_maxr.
-rewrite get_offunm.
-by rewrite cols_offunm rows_offunm lez_maxr.
-rewrite get_offunm.
-by rewrite cols_offunm rows_offunm lez_maxr.
-rewrite get_offunm.
-by rewrite cols_offunm rows_offunm lez_maxr.
+rewrite /open.
+rewrite get_offunm; first by rewrite cols_offunm rows_offunm lez_maxr.
+rewrite get_offunm; first by rewrite cols_offunm rows_offunm lez_maxr.
+rewrite get_offunm; first by rewrite cols_offunm rows_offunm lez_maxr.
+rewrite get_offunm; first by rewrite cols_offunm rows_offunm lez_maxr.
 simplify.
-
 rewrite !addrA.
 rewrite !ComRing.mulrDl.
 rewrite !mulrDr.
@@ -1156,25 +1148,21 @@ rewrite _4p //.
 (* 2. prove diag zero *)
 rewrite 6!get_addm.
 have alt4 : a < 4.
-move : H24.
+move : H18.
 rewrite 6!rows_addm.
 rewrite valid_size // valid_size // valid_size //
         valid_size // valid_size // valid_size //.
 rewrite _4p //.
 
-clear H24 H26.
+clear H18 H20.
 rewrite valid_diag0 // valid_diag0 // valid_diag0 //
         valid_diag0 // valid_diag0 // valid_diag0 //.
 rewrite get_offunm /= //.
-rewrite _4p //.
 smt(zeroE).
 
 (* 3a. prove columns consistent *)
-(* don't actually need open anymore *)
-clear H5 H8 H7 H10 H11 H13 H14 H16 H17 H19 H20 H22.
-
 have plt4 : p < 4.
-move : H24.
+move : H18.
 rewrite 6!rows_addm.
 rewrite valid_size // valid_size // valid_size //
         valid_size // valid_size // valid_size //.
@@ -1188,21 +1176,18 @@ rewrite valid_size // valid_size // valid_size //
 rewrite _4p /= lez_maxr.
 smt().
 
-clear H24 H26.
-
 rewrite valid_size // valid_size // valid_size //
         valid_size // valid_size // valid_size //.
-rewrite _4p.
-rewrite lez_maxr //.
+rewrite _4p lez_maxr //.
 
 rewrite 6!get_addm.
 rewrite get_offunm.
 rewrite cols_offunm rows_offunm.
-rewrite _4p //.
+trivial.
 simplify.
 rewrite 5!get_addm.
 rewrite get_offunm.
-rewrite cols_offunm rows_offunm _4p lez_maxr //.
+rewrite cols_offunm rows_offunm lez_maxr //.
 trivial.
 simplify.
 have zneqp : 0 <> p by smt().
@@ -1227,26 +1212,22 @@ rewrite _4p /#.
 trivial.
 
 (* 3b. prove the other columns are consistent *)
-clear H5 H8 H7 H10 H11 H13 H14 H16 H17 H19 H20 H22.
-
 have plt4 : p < 4.
-move : H24.
+move : H18.
 rewrite 6!rows_addm.
 rewrite valid_size // valid_size // valid_size //
         valid_size // valid_size // valid_size //.
 rewrite _4p rows_offunm lez_maxr // lez_maxr.
 
 have slt4 : s < 4.
-move : H26.
+move : H20.
 rewrite 6!cols_addm.
 rewrite valid_size // valid_size // valid_size //
         valid_size // valid_size // valid_size //.
 rewrite _4p cols_offunm lez_maxr // lez_maxr.
 
-clear H24 H26.
-
 rewrite get_offunm.
-rewrite rows_offunm cols_offunm _4p.
+rewrite rows_offunm cols_offunm.
 rewrite 5!rows_addm 5!cols_addm.
 rewrite valid_size // valid_size // valid_size //
         valid_size // valid_size // valid_size //.
@@ -1263,17 +1244,16 @@ simplify.
 rewrite 11!get_addm.
 rewrite get_offunm.
 rewrite cols_offunm rows_offunm.
-smt(_4p).
+trivial.
 simplify.
 rewrite get_offunm.
 rewrite cols_offunm rows_offunm.
-smt(_4p).
+trivial.
 simplify.
-rewrite H28.
 simplify.
-have sneqp : s <> p by smt().
-rewrite sneqp /=.
-
+rewrite H22.
+rewrite eq_sym in H21.
+simplify.
 rewrite (valid_colp result) //.
 rewrite valid_size // valid_size // _4p /#.
 rewrite (valid_colp result0) //.

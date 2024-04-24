@@ -217,6 +217,42 @@ module Sim = {
     return minp;
   }
 
+   proc mult(x y : matrix) : matrix = {
+    var m23, m13, m12, m03, m02, m01, mlocal : matrix;
+    (* perform inp on pairs of shares held by both parties.
+      for example, both parties 2 and 3 hold x0, x1, y0, y1, so they
+      can together compute the term x0y1 * x1y0.
+      
+      For symmetry we alternate which party we take the share from, but
+      the validity check ensures this doesn't actually change the output.
+     *)
+    m23 <@ inp(x.[0, 1] * y.[1, 0] + x.[1, 0] * y.[0, 1], 2, 3, 0, 1);
+    m13 <@ inp(x.[0, 2] * y.[1, 0] + x.[1, 0] * y.[0, 2], 1, 3, 0, 2);
+    m12 <@ inp(x.[0, 3] * y.[1, 0] + x.[1, 0] * y.[0, 3], 1, 2, 0, 3);
+    m03 <@ inp(x.[0, 2] * y.[0, 1] + x.[0, 1] * y.[0, 2], 0, 3, 1, 2);
+    m02 <@ inp(x.[0, 3] * y.[0, 1] + x.[0, 1] * y.[0, 3], 0, 2, 1, 3);
+    m01 <@ inp(x.[0, 3] * y.[0, 2] + x.[0, 2] * y.[0, 3], 0, 1, 2, 3);
+
+    (* elementwise multiplication to create sharing of x_i * y_i
+       this implements inp_local: no communication occurs *)
+    mlocal <- offunm ((fun p s => 
+      if s = p then zero else x.[p, s] * y.[p, s]), N, N);
+
+    (* elementwise addition *)
+    return m01 + m02 + m03 + m12 + m13 + m23 + mlocal;   
+  }
+
+  proc mult_main(x y : elem) : matrix = {
+    var mx, my, mz : matrix;
+
+    mx <@ share(x);
+    my <@ share(y);
+
+    mz <@ mult(mx, my);
+
+    return mz;
+  }
+
   proc add(x y : elem) : matrix = {
     var mx, my : matrix;
 
@@ -827,17 +863,13 @@ qed.
  *
  * precondition is ugly, maybe could be cleaned up with FSet.
  *)
-lemma inp_secure(p : party) :
+
+lemma inp_secure(i_ j_ g_ h_ : party, p : party) :
     equiv[F4.inp ~ Sim.inp :
-    (* inputs are equal *)
-      ={x,h,i,j,g} /\
-        (* inputs are in [0, 4) *)
-        0 <= p < N /\ 0 <= i{1} < N /\ 0 <= j{1} < N /\ 0 <= g{1} < N /\ 0 <= h{1} < N /\
-        (* viewing party is not i or j *)
-        p <> i{1} /\ p <> j{1} /\
-        (* inputs are distinct *)
-        h{1} <> i{1} /\ h{1} <> j{1} /\ h{1} <> g{1} /\
-        i{1} <> j{1} /\ i{1} <> g{1} /\ j{1} <> g{1}
+      ={x, i, j, g, h} /\
+      i{1} = i_ /\ j{1} = j_ /\ g{1} = g_ /\ h{1} = h_ /\ 
+      uniq [i_; j_; g_; h_] /\ (p = g_ \/ p = h_) /\
+      0 <= p < N /\ 0 <= i_ < N /\ 0 <= j_ < N /\ 0 <= h_ < N /\ 0 <= g_ < N
       ==>
       size res{1} = (N, N) /\ size res{2} = (N, N) /\ view res{1} p = view res{2} p].
 proof.
@@ -846,10 +878,11 @@ auto.
 (* first case: viewing party is party h, which has share (0, 0, r) *)
 case (p = h{1}).
 (* r are the same *)
-seq 1 1 : (={x,h,i,j,g,r} /\ p = h{1} /\ h{1} <> g{1} /\ 0 <= p < N).
+seq 1 1 : (={x,h,i,j,g,r} /\ p = h_ /\ h{1} = h_ /\ h_ <> g_ /\ 0 <= p < N).
 auto.
 (* party h cannot see xh, so eat it *)
-seq 1 1 : (={x,h,i,j,g,r} /\ p = h{1} /\ h{1} <> g{1} /\ 0 <= p < N).
+progress; by rewrite eq_sym.
+seq 1 1 : (={x,h,i,j,g,r} /\ p = h_ /\ h{1} = h_ /\ h_ <> g_ /\ 0 <= p < N).
 auto.
 (* handle calls to jmp - same, but we can ignore xh, so value is unimportant *)
 auto.
@@ -868,21 +901,17 @@ rewrite !get_offunm; first 3 rewrite rows_offunm cols_offunm lez_maxr //.
 simplify.
 smt().
 
-(* p <> h, so p = g *
- * in this case, party g's share is (0, 0, xh := x - r)
- * we can't introduce p = g yet but will do it later. *)
+(* second case: p = g, so share is (0, 0, xh := r - g *)
 seq 0 1 : (={x,h,i,j,g} /\
-  0 <= p < N /\ 0 <= i{1} < N /\ 0 <= j{1} < N /\ 0 <= g{1} < N /\ 0 <= h{1} < N /\
-  p <> i{1} /\ p <> j{1} /\ p <> h{1} /\
-  h{1} <> i{1} /\ h{1} <> j{1} /\ h{1} <> g{1} /\
-  i{1} <> j{1} /\ i{1} <> g{1} /\ j{1} <> g{1}).
+  0 <= p < N /\ 0 <= i_ < N /\ 0 <= j_ < N /\ 0 <= g_ < N /\ 0 <= h_ < N /\
+  p = g_ /\ g_ = g{2} /\ uniq [i_; j_; g_; h_]).
 (* eat r on the right *)
 auto.
+progress.
+smt().
 seq 1 1 : (={x,h,i,j,g} /\ xh{2} = x{1} - r{1} /\
-  0 <= p < N /\ 0 <= i{1} < N /\ 0 <= j{1} < N /\ 0 <= g{1} < N /\ 0 <= h{1} < N /\
-  p <> i{1} /\ p <> j{1} /\ p <> h{1} /\
-  h{1} <> i{1} /\ h{1} <> j{1} /\ h{1} <> g{1} /\
-  i{1} <> j{1} /\ i{1} <> g{1} /\ j{1} <> g{1}).
+  0 <= p < N /\ 0 <= i_ < N /\ 0 <= j_ < N /\ 0 <= g_ < N /\ 0 <= h_ < N /\
+  p = g_ /\ g_ = g{2} /\ uniq [i_; j_; g_; h_]).
 rnd (fun u => x{1} - u).
 auto.
 progress; first 2 by rewrite subK.
@@ -891,7 +920,6 @@ sp.
 inline; auto.
 rewrite _4p.
 progress.
-have p_eq_g : p = g{2} by smt().
 rewrite /view /row !cols_offunm lez_maxr // eq_vectorP !size_offunv //=.
 move => sh [shgt0 shlt4].
 rewrite !get_offunv //= !get_offunm; first 2 rewrite rows_offunm cols_offunm //=.
@@ -1030,6 +1058,37 @@ by rewrite _4p.
 by simplify.
 qed.
 *)
+
+
+
+(************************)
+(* MULT *****************)
+(************************)
+
+
+lemma mult_secure(p : party) :
+    equiv[F4.mult ~ Sim.mult :
+      ={x, y} /\ 0 <= p < N
+      ==>
+      view res{1} p = view res{2} p].
+proof.
+proc.
+
+wp.
+sp.
+call (inp_secure 0 1 2 3 p).
+call (inp_secure 0 2 1 3 p).
+call (inp_secure 0 3 1 2 p).
+call (inp_secure 1 2 0 3 p).
+call (inp_secure 1 3 0 2 p).
+call (inp_secure 2 3 0 1 p).
+auto.
+rewrite _4p //=.
+progress.
+
+
+qed.
+
 
 
 (* annoying, but if we try to smt() this down below without the intermediate lemma,
@@ -1270,4 +1329,5 @@ rewrite (valid_colp mx{hr}) //.
 rewrite valid_size // valid_size // _4p /#.
 rewrite (valid_colp my{hr}) //.
 rewrite valid_size // valid_size // _4p /#.
+smt().
 qed.

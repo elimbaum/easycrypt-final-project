@@ -217,6 +217,42 @@ module Sim = {
     return minp;
   }
 
+   proc mult(x y : matrix) : matrix = {
+    var m23, m13, m12, m03, m02, m01, mlocal : matrix;
+    (* perform inp on pairs of shares held by both parties.
+      for example, both parties 2 and 3 hold x0, x1, y0, y1, so they
+      can together compute the term x0y1 * x1y0.
+      
+      For symmetry we alternate which party we take the share from, but
+      the validity check ensures this doesn't actually change the output.
+     *)
+    m23 <@ inp(x.[0, 1] * y.[1, 0] + x.[1, 0] * y.[0, 1], 2, 3, 0, 1);
+    m13 <@ inp(x.[0, 2] * y.[1, 0] + x.[1, 0] * y.[0, 2], 1, 3, 0, 2);
+    m12 <@ inp(x.[0, 3] * y.[1, 0] + x.[1, 0] * y.[0, 3], 1, 2, 0, 3);
+    m03 <@ inp(x.[0, 2] * y.[0, 1] + x.[0, 1] * y.[0, 2], 0, 3, 1, 2);
+    m02 <@ inp(x.[0, 3] * y.[0, 1] + x.[0, 1] * y.[0, 3], 0, 2, 1, 3);
+    m01 <@ inp(x.[0, 3] * y.[0, 2] + x.[0, 2] * y.[0, 3], 0, 1, 2, 3);
+
+    (* elementwise multiplication to create sharing of x_i * y_i
+       this implements inp_local: no communication occurs *)
+    mlocal <- offunm ((fun p s => 
+      if s = p then zero else x.[p, s] * y.[p, s]), N, N);
+
+    (* elementwise addition *)
+    return m01 + m02 + m03 + m12 + m13 + m23 + mlocal;   
+  }
+
+  proc mult_main(x y : elem) : matrix = {
+    var mx, my, mz : matrix;
+
+    mx <@ share(x);
+    my <@ share(y);
+
+    mz <@ mult(mx, my);
+
+    return mz;
+  }
+
   proc add(x y : elem) : matrix = {
     var mx, my : matrix;
 
@@ -800,7 +836,7 @@ qed.
  *
  * precondition is ugly, maybe could be cleaned up with FSet.
  *)
-lemma inp_secure(i_ j_ g_ h_ : party, p : party) :
+lemma inp_secure(p : party) :
     equiv[F4.inp ~ Sim.inp :
       ={x, i, j, g, h} /\
       i{1} = i_ /\ j{1} = j_ /\ g{1} = g_ /\ h{1} = h_ /\ 
@@ -991,6 +1027,37 @@ by rewrite _4p.
 by simplify.
 qed.
 *)
+
+
+
+(************************)
+(* MULT *****************)
+(************************)
+
+
+lemma mult_secure(p : party) :
+    equiv[F4.mult ~ Sim.mult :
+      ={x, y} /\ 0 <= p < N
+      ==>
+      view res{1} p = view res{2} p].
+proof.
+proc.
+
+wp.
+sp.
+call (inp_secure 0 1 2 3 p).
+call (inp_secure 0 2 1 3 p).
+call (inp_secure 0 3 1 2 p).
+call (inp_secure 1 2 0 3 p).
+call (inp_secure 1 3 0 2 p).
+call (inp_secure 2 3 0 1 p).
+auto.
+rewrite _4p //=.
+progress.
+
+
+qed.
+
 
 
 (* annoying, but if we try to smt() this down below without the intermediate lemma,
@@ -1232,4 +1299,5 @@ rewrite (valid_colp mx{hr}) //.
 rewrite valid_size // valid_size // _4p /#.
 rewrite (valid_colp my{hr}) //.
 rewrite valid_size // valid_size // _4p /#.
+smt().
 qed.

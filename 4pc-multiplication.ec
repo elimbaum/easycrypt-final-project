@@ -359,24 +359,12 @@ lemma sum_four(s : elem list) :
     nth err s 0 + nth err s 1 + nth err s 2 + nth err s 3.
 proof.
 progress.
-rewrite /sumz_elem -{1}take_size H.
-have T4 : take 4 s = rcons (take 3 s) (nth err s 3).
-  rewrite -take_nth.
-  rewrite H // take_nth.
-  by simplify.
-have T3 : take 3 s = rcons (take 2 s) (nth err s 2).
-  rewrite -take_nth.
-  rewrite H // take_nth.
-  by simplify.
-have T2 : take 2 s = rcons (take 1 s) (nth err s 1).
-  rewrite -take_nth.
-  rewrite H // take_nth.
-  by simplify.
-have T1 : take 1 s = rcons (take 0 s) (nth err s 0).
-  rewrite -take_nth.
-  rewrite H // take_nth.
-  by simplify.
-rewrite T4 T3 T2 T1 take0.
+rewrite /sumz_elem -take_size H.
+rewrite (take_nth err 3); first by rewrite H.
+rewrite (take_nth err 2); first by rewrite H.
+rewrite (take_nth err 1); first by rewrite H.
+rewrite (take_nth err 0); first by rewrite H.
+rewrite take0.
 smt(addrA addrC add0r).
 qed.
 
@@ -479,27 +467,20 @@ rewrite cols_offunm _4p lez_maxr //.
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm //.
 by simplify.
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm // lez_maxr //.
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm // lez_maxr //.
+rewrite get_offunm; first by rewrite rows_offunm cols_offunm // lez_maxr //.
+rewrite get_offunm; first by rewrite rows_offunm cols_offunm // lez_maxr //.
 by rewrite /= H4 /=.
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm // lez_maxr //.
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm // lez_maxr //.
+rewrite get_offunm; first by rewrite rows_offunm cols_offunm // lez_maxr //.
+rewrite get_offunm; first by rewrite rows_offunm cols_offunm // lez_maxr //.
 rewrite /= H4 /=.
 have H5p : 0 <> s by smt().
 by rewrite H5p /=.
 (* correct *)
-rewrite /open get_offunm.
-rewrite rows_offunm cols_offunm => /=; smt(_4p).
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm => /=; smt(_4p).
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm => /=; smt(_4p).
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm => /=; smt(_4p).
+rewrite /open.
+rewrite get_offunm; first by rewrite rows_offunm cols_offunm //=.
+rewrite get_offunm; first by rewrite rows_offunm cols_offunm //=.
+rewrite get_offunm; first by rewrite rows_offunm cols_offunm //=.
+rewrite get_offunm; first by rewrite rows_offunm cols_offunm //=.
 simplify.
 (* sums match *)
 rewrite (sum_four shares{hr}) //.
@@ -509,17 +490,10 @@ qed.
 lemma simplify_share_secure_1 (x s0 s1 s3 : zmod):
     x - (s0 + s1 + (x - (s0 + s1 + s3))) = s3.
 proof.
-rewrite !subdist.
-rewrite negneg.
-rewrite (addrC (x - s0 - s1)).
-rewrite !addrA.
-rewrite addNr.
-rewrite add0r.
-rewrite (addrC (-s0 - s1)).
-rewrite !addrA.
-rewrite subrr.
-rewrite add0r.
-rewrite addNr.
+rewrite !subdist negneg (addrC (x - s0 - s1)) !addrA.
+rewrite addNr add0r.
+rewrite (addrC (-s0 - s1)) !addrA subrr.
+rewrite add0r addNr.
 by rewrite add0r.
 qed.
 
@@ -545,9 +519,9 @@ lemma share_secure(p : party) :
 proof.
 proc.
 wp.
+
 (*** party 3 ***) 
 (* easy: all random in both cases *)
-
 case (p = 3).
 seq 3 3 : (={s0, s1, s2} /\ p = 3); auto. 
 rewrite _4p.
@@ -556,13 +530,14 @@ rewrite /view /row 2!cols_offunm lez_maxr // eq_vectorP 2!size_offunv //=.
 move => sh [shgt0 shlt4].
 (* extract matrix *)
 rewrite !get_offunv //=.
-rewrite !get_offunm.
-rewrite rows_offunm cols_offunm //.
+rewrite !get_offunm; first rewrite rows_offunm cols_offunm //.
 rewrite rows_offunm cols_offunm //.
 simplify.
 case (sh = 0) => [// | shn0].
 case (sh = 1) => [// | shn1].
-case (sh = 2) => [// | /#].
+case (sh = 2) => //.
+smt().
+
 (* other parties. last share is technically non-random but still looks it. *)
 (*** party 2 ***)
 case (p = 2).
@@ -573,17 +548,14 @@ auto.
 rnd (fun u => x{1} - (s0{1} + s1{1} + u)).
 auto.
 rewrite _4p.
-progress.
-by rewrite simplify_share_secure_1.
-by rewrite simplify_share_secure_1.
+progress; first 2 by rewrite simplify_share_secure_1.
 (* non-trivial views are equal *)
 rewrite /view /row 2!cols_offunm lez_maxr // eq_vectorP 2!size_offunv //=.
 move => sh [shgt0 shlt4].
 (* extract matrix *)
 rewrite !get_offunv //=.
-rewrite !get_offunm.
-rewrite rows_offunm cols_offunm /#.
-rewrite rows_offunm cols_offunm /#.
+rewrite !get_offunm; first rewrite rows_offunm cols_offunm /#.
+rewrite rows_offunm cols_offunm //=.
 simplify.
 case (sh = 0) => [// | shn0].
 case (sh = 1) => [// | shn1].

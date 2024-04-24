@@ -267,6 +267,7 @@ module F4 = {
   proc jmp(x : elem, si sj g h : party) : matrix = {
     (* TODO: party g gets x from si, and H(x) from sj *)
     (* abort if hashes don't check out *)
+    (* mayank points out: don't do hash. just both send. *)
     var mjmp : matrix;
 
     mjmp <- offunm ((fun p s =>
@@ -827,17 +828,12 @@ qed.
  *
  * precondition is ugly, maybe could be cleaned up with FSet.
  *)
-lemma inp_secure(p : party) :
+lemma inp_secure(i_ j_ g_ h_ : party, p : party) :
     equiv[F4.inp ~ Sim.inp :
-    (* inputs are equal *)
-      ={x,h,i,j,g} /\
-        (* inputs are in [0, 4) *)
-        0 <= p < N /\ 0 <= i{1} < N /\ 0 <= j{1} < N /\ 0 <= g{1} < N /\ 0 <= h{1} < N /\
-        (* viewing party is not i or j *)
-        p <> i{1} /\ p <> j{1} /\
-        (* inputs are distinct *)
-        h{1} <> i{1} /\ h{1} <> j{1} /\ h{1} <> g{1} /\
-        i{1} <> j{1} /\ i{1} <> g{1} /\ j{1} <> g{1}
+      ={x, i, j, g, h} /\
+      i{1} = i_ /\ j{1} = j_ /\ g{1} = g_ /\ h{1} = h_ /\ 
+      uniq [i_; j_; g_; h_] /\ (p = g_ \/ p = h_) /\
+      0 <= p < N /\ 0 <= i_ < N /\ 0 <= j_ < N /\ 0 <= h_ < N /\ 0 <= g_ < N
       ==>
       size res{1} = (N, N) /\ size res{2} = (N, N) /\ view res{1} p = view res{2} p].
 proof.
@@ -846,10 +842,11 @@ auto.
 (* first case: viewing party is party h, which has share (0, 0, r) *)
 case (p = h{1}).
 (* r are the same *)
-seq 1 1 : (={x,h,i,j,g,r} /\ p = h{1} /\ h{1} <> g{1} /\ 0 <= p < N).
+seq 1 1 : (={x,h,i,j,g,r} /\ p = h_ /\ h{1} = h_ /\ h_ <> g_ /\ 0 <= p < N).
 auto.
 (* party h cannot see xh, so eat it *)
-seq 1 1 : (={x,h,i,j,g,r} /\ p = h{1} /\ h{1} <> g{1} /\ 0 <= p < N).
+progress; by rewrite eq_sym.
+seq 1 1 : (={x,h,i,j,g,r} /\ p = h_ /\ h{1} = h_ /\ h_ <> g_ /\ 0 <= p < N).
 auto.
 (* handle calls to jmp - same, but we can ignore xh, so value is unimportant *)
 auto.
@@ -868,21 +865,17 @@ rewrite !get_offunm; first 3 rewrite rows_offunm cols_offunm lez_maxr //.
 simplify.
 smt().
 
-(* p <> h, so p = g *
- * in this case, party g's share is (0, 0, xh := x - r)
- * we can't introduce p = g yet but will do it later. *)
+(* second case: p = g, so share is (0, 0, xh := r - g *)
 seq 0 1 : (={x,h,i,j,g} /\
-  0 <= p < N /\ 0 <= i{1} < N /\ 0 <= j{1} < N /\ 0 <= g{1} < N /\ 0 <= h{1} < N /\
-  p <> i{1} /\ p <> j{1} /\ p <> h{1} /\
-  h{1} <> i{1} /\ h{1} <> j{1} /\ h{1} <> g{1} /\
-  i{1} <> j{1} /\ i{1} <> g{1} /\ j{1} <> g{1}).
+  0 <= p < N /\ 0 <= i_ < N /\ 0 <= j_ < N /\ 0 <= g_ < N /\ 0 <= h_ < N /\
+  p = g_ /\ g_ = g{2} /\ uniq [i_; j_; g_; h_]).
 (* eat r on the right *)
 auto.
+progress.
+smt().
 seq 1 1 : (={x,h,i,j,g} /\ xh{2} = x{1} - r{1} /\
-  0 <= p < N /\ 0 <= i{1} < N /\ 0 <= j{1} < N /\ 0 <= g{1} < N /\ 0 <= h{1} < N /\
-  p <> i{1} /\ p <> j{1} /\ p <> h{1} /\
-  h{1} <> i{1} /\ h{1} <> j{1} /\ h{1} <> g{1} /\
-  i{1} <> j{1} /\ i{1} <> g{1} /\ j{1} <> g{1}).
+  0 <= p < N /\ 0 <= i_ < N /\ 0 <= j_ < N /\ 0 <= g_ < N /\ 0 <= h_ < N /\
+  p = g_ /\ g_ = g{2} /\ uniq [i_; j_; g_; h_]).
 rnd (fun u => x{1} - u).
 auto.
 progress; first 2 by rewrite subK.
@@ -891,7 +884,6 @@ sp.
 inline; auto.
 rewrite _4p.
 progress.
-have p_eq_g : p = g{2} by smt().
 rewrite /view /row !cols_offunm lez_maxr // eq_vectorP !size_offunv //=.
 move => sh [shgt0 shlt4].
 rewrite !get_offunv //= !get_offunm; first 2 rewrite rows_offunm cols_offunm //=.
@@ -900,9 +892,6 @@ rewrite !get_offunm; first 3 rewrite rows_offunm cols_offunm lez_maxr //=.
 simplify.
 smt().
 qed.
-
-
-
 
 (************************)
 (* ADD ******************)
@@ -1253,6 +1242,7 @@ simplify.
 simplify.
 rewrite H22.
 rewrite eq_sym in H21.
+rewrite H21.
 simplify.
 rewrite (valid_colp result) //.
 rewrite valid_size // valid_size // _4p /#.

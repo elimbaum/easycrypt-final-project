@@ -1055,6 +1055,9 @@ skip.
 rewrite _4p /=.
 move => &1 &2 xyp.
 split; first by smt().
+elim => view0eq p5c rL rR.
+elim => rLsize.
+elim => rRsize rLRview.
 move => ? ? ? ?.
 split; first by smt().
 move => ????.

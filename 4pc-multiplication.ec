@@ -1,4 +1,4 @@
-prover quorum=2 ["Alt-Ergo" "Z3"].
+prover quorum=1 ["Alt-Ergo" "Z3"].
 timeout 2.  (* limit SMT solvers to two seconds *)
 require import AllCore FSet List Distr.
 require import Bool IntDiv.
@@ -239,7 +239,7 @@ module Sim = {
       if s = p then zero else x.[p, s] * y.[p, s]), N, N);
 
     (* elementwise addition *)
-    return m01 + m02 + m03 + m12 + m13 + m23 + mlocal;   
+    return m01 + m02 + m03 + m12 + m13 + m23 + mlocal;
   }
 
   proc mult_main(x y : elem) : matrix = {
@@ -836,7 +836,7 @@ qed.
  *
  * precondition is ugly, maybe could be cleaned up with FSet.
  *)
-lemma inp_secure(p : party) :
+lemma inp_secure(i_ j_ g_ h_ : party, p : party) :
     equiv[F4.inp ~ Sim.inp :
       ={x, i, j, g, h} /\
       i{1} = i_ /\ j{1} = j_ /\ g{1} = g_ /\ h{1} = h_ /\ 
@@ -1035,26 +1035,50 @@ qed.
 (************************)
 
 
-lemma mult_secure(p : party) :
+lemma mult_secure(p p0 p1 p2 p3 p4 p5: party) :
     equiv[F4.mult ~ Sim.mult :
-      ={x, y} /\ 0 <= p < N
+      ={x, y} /\ 0 <= p < N /\
+      p0 \in [2; 3] /\ p1 \in [1; 3] /\ p2 \in [1; 2] /\ p3 \in [0; 3] /\ p4 \in [0; 2] /\ p5 \in [0; 1]
       ==>
       view res{1} p = view res{2} p].
 proof.
 proc.
-
-wp.
-sp.
-call (inp_secure 0 1 2 3 p).
-call (inp_secure 0 2 1 3 p).
-call (inp_secure 0 3 1 2 p).
-call (inp_secure 1 2 0 3 p).
-call (inp_secure 1 3 0 2 p).
-call (inp_secure 2 3 0 1 p).
 auto.
-rewrite _4p //=.
-progress.
-
+call (inp_secure 0 1 2 3 p0) => //=.
+call (inp_secure 0 2 1 3 p1) => //=.
+call (inp_secure 0 3 1 2 p2) => //=.
+call (inp_secure 1 2 0 3 p3) => //=.
+call (inp_secure 1 3 0 2 p4) => //=.
+call (inp_secure 2 3 0 1 p5).
+simplify.
+skip.
+rewrite _4p /=.
+move => &1 &2 xyp.
+split; first by smt().
+move => ? ? ? ?.
+split; first by smt().
+move => ????.
+split; first by smt().
+move => ????.
+split; first by smt().
+move => ????.
+split; first by smt().
+move => ????.
+split; first by smt().
+move => ????.
+rewrite !view_linear.
+rewrite !cols_addm !rows_addm; smt().
+rewrite !cols_addm !rows_addm; smt().
+rewrite !cols_addm !rows_addm; smt().
+rewrite !cols_addm !rows_addm; smt().
+rewrite !cols_addm !rows_addm; smt().
+smt().
+rewrite !cols_addm !rows_addm; smt().
+rewrite !cols_addm !rows_addm; smt().
+rewrite !cols_addm !rows_addm; smt().
+rewrite !cols_addm !rows_addm; smt().
+rewrite !cols_addm !rows_addm; smt().
+smt().
 
 qed.
 

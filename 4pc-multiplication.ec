@@ -157,6 +157,36 @@ module Sim = {
         if p_ = s then zero else (nth err shares s)), N, N);
   }
 
+   proc jmp(x : elem, si sj d g  :party) : matrix = {
+    (* TODO: party d gets x from si, and H(x) from sj *)
+    (* abort if hashes don't check out *)
+    var mjmp : matrix;
+
+    mjmp <- offunm ((fun p s =>
+        if p = s then zero else
+        if g = s then x else zero), N, N);
+    return mjmp;
+  }
+
+  proc inp(x : elem, i j g h : party) : matrix = {
+    var r, xh, x_rand: elem;
+    var pgm, minp : matrix;
+
+    (* in the paper this is a PRF, but for now model as truly random
+       and just don't give it to party g. *)
+    r <$ randelem;
+    
+    xh <$ randelem;
+
+    (* Pg learns xh *)
+    pgm <@ jmp(xh, i, j, g, h);
+
+    minp <- pgm + offunm ((fun p s => 
+      if s = p then zero else
+      if s = h then r else zero), N, N);
+    return minp;
+  }
+
   proc add(x y : elem) : matrix = {
     var mx, my : matrix;
 
@@ -368,10 +398,17 @@ rewrite !addrA addNr add0r.
 by rewrite addrC addrA addNr add0r.
 qed.
 
+
 lemma negdist (a b : zmod) :
     -(a + b) = (-a) + (-b).
 proof.
 by rewrite -addS negneg addrC subdist subrr add0r.
+qed.
+
+lemma negnegdist (a b c: zmod) :
+   a -(a - b) = b.
+proof.
+by rewrite subdist negneg subrr add0r.
 qed.
 
 
@@ -455,6 +492,13 @@ by rewrite !addrA addNr add0r.
 qed.
 
 
+
+
+
+
+
+
+
 (* Prove the sharing scheme is secure.
    For all parties, view looks random.
  *)
@@ -468,6 +512,7 @@ proc.
 wp.
 (*** party 3 ***) 
 (* easy: all random in both cases *)
+
 case (p = 3).
 seq 3 3 : (={s0, s1, s2} /\ p = 3); auto. 
 rewrite _4p.
@@ -560,6 +605,7 @@ by rewrite subK.
 by rewrite subK.
 rewrite /view /row 2!cols_offunm lez_maxr // eq_vectorP 2!size_offunv //=.
 move => sh [shgt0 shlt4].
+
 rewrite !get_offunv //=.
 rewrite !get_offunm.
 rewrite rows_offunm cols_offunm /#.
@@ -573,6 +619,99 @@ rewrite 2!subdist.
 rewrite !addS !addrA.
 by rewrite -add_cleanup.
 qed.
+
+
+
+
+
+
+
+lemma inp_secure(p : party) :
+    equiv[F4.inp ~ Sim.inp :
+      ={x,h} /\ 0 <= p < N       
+      ==>
+      size res{1} = (N, N) /\ size res{2} = (N, N) /\ view res{1} p = view res{2} p].
+proof.
+proc.
+case: (p = 3).
+seq 1 1: (={x, h, r} /\ p = 3).
+auto.
+seq 1 1: (={x, h, r} /\ p = 3).
+auto.
+wp.
+inline*.
+wp.
+auto.
+progress.
+rewrite rows_offunm /max _4p /#.
+rewrite cols_offunm /max _4p /#.
+rewrite rows_offunm /max _4p /#.
+rewrite cols_offunm /max _4p /#.
+rewrite /view /row 2!cols_offunm lez_maxr //.
+rewrite /max _4p.
+simplify.
+rewrite /max //.
+rewrite /view /row 2!cols_offunm lez_maxr //.
+rewrite /max _4p.
+simplify.
+rewrite /max //.
+simplify.
+rewrite  eq_vectorP.
+rewrite !size_offunv.
+simplify.
+progress.
+rewrite !get_offunv //=.
+rewrite !get_offunm.
+rewrite rows_offunm cols_offunm /#.
+rewrite rows_offunm cols_offunm /#.
+case (sh = 0) => [// | shn0].
+case (sh = 1) => [// | shn1].
+case (sh = 2) => [// | shn2].
+have sh3 : sh = 3 by smt().
+rewrite sh3 //=.
+rewrite 2!subdist.
+rewrite !addS !addrA.
+by rewrite -add_cleanup.
+rewrite get_addm.
+simplify.
+qed.
+
+
+(*
+proc.
+seq 1 1: (={x,r, h} /\ 0 <= p < N ).
+auto.
+
+seq 1 1: (={x, r, h} /\ 0 <= p < N /\ xh{1} = x{1}-r{1}).
+
+wp.
+rnd
+rnd{2} (fun u => x{1} - u).
+auto.
+
+
+inline*.
+wp.
+auto.
+progress.
+rewrite rows_offunm /max _4p /#.
+rewrite cols_offunm /max _4p /#.
+rewrite rows_offunm /max _4p /#.
+rewrite cols_offunm /max _4p /#.
+qed.*)
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 (* Prove addition is correct *)
 lemma add_correct(x_ y_ : elem) :
@@ -855,6 +994,8 @@ case: (h_ = 0).
  by smt(addrC addrA addNr add0r).
 smt(addrC addrA addNr add0r).
 qed.
+
+
 
 (* annoying, but if we try to smt() this down below without the intermediate lemma,
    smt gets confused. (maybe too much in context) *)

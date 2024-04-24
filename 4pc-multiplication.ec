@@ -628,15 +628,15 @@ qed.
 
 lemma inp_secure(p : party) :
     equiv[F4.inp ~ Sim.inp :
-      ={x,h} /\ 0 <= p < N       
+      ={x,h,i,j,g} /\ 0 <= p < N /\ p <> i{1} /\ p <> j{1}
       ==>
       size res{1} = (N, N) /\ size res{2} = (N, N) /\ view res{1} p = view res{2} p].
 proof.
 proc.
-case: (p = 3).
-seq 1 1: (={x, h, r} /\ p = 3).
+case: (h{1} <> p).
+seq 1 1: (={x, h, r} /\ 0 <= p < N  /\ p <> i{1} /\ p <> j{1}).
 auto.
-seq 1 1: (={x, h, r} /\ p = 3).
+seq 1 1: (={x, h, r} /\ 0 <= p < N  /\ p <> i{1} /\ p <> j{1}).
 auto.
 wp.
 inline*.
@@ -662,18 +662,50 @@ simplify.
 progress.
 rewrite !get_offunv //=.
 rewrite !get_offunm.
-rewrite rows_offunm cols_offunm /#.
-rewrite rows_offunm cols_offunm /#.
-case (sh = 0) => [// | shn0].
-case (sh = 1) => [// | shn1].
-case (sh = 2) => [// | shn2].
-have sh3 : sh = 3 by smt().
-rewrite sh3 //=.
-rewrite 2!subdist.
-rewrite !addS !addrA.
-by rewrite -add_cleanup.
-rewrite get_addm.
+rewrite rows_offunm cols_offunm.
 simplify.
+rewrite /max.
+simplify.
+rewrite _4p in H0.
+smt().
+
+rewrite !rows_offunm !cols_offunm.
+rewrite !lez_maxr //.
+rewrite _4p in H0.
+
+smt().
+simplify.
+rewrite !get_offunm.
+rewrite rows_offunm cols_offunm.
+rewrite !lez_maxr //.
+rewrite _4p in H0.
+smt().
+
+
+rewrite rows_offunm cols_offunm.
+rewrite !lez_maxr //.
+rewrite _4p in H0.
+smt().
+
+rewrite rows_offunm cols_offunm.
+rewrite !lez_maxr //.
+rewrite _4p in H0.
+smt().
+
+simplify.
+
+
+ /#.
+rewrite rows_offunm cols_offunm /#.
+rewrite rows_offunm cols_offunm /#.
+simplify.
+case (i0 = 3) => [// | ion3].
+rewrite eq_sym in ion3.
+rewrite ion3.
+simplify.
+admit.
+
+
 qed.
 
 

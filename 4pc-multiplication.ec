@@ -303,6 +303,7 @@ module F4 = {
   proc jmp(x : elem, si sj g h : party) : matrix = {
     (* TODO: party g gets x from si, and H(x) from sj *)
     (* abort if hashes don't check out *)
+    (* mayank points out: don't do hash. just both send. *)
     var mjmp : matrix;
 
     mjmp <- offunm ((fun p s =>
@@ -863,8 +864,7 @@ qed.
  *
  * precondition is ugly, maybe could be cleaned up with FSet.
  *)
-
-lemma inp_secure(i_ j_ g_ h_ : party, p : party) :
+lemma inp_secure(p : party) :
     equiv[F4.inp ~ Sim.inp :
       ={x, i, j, g, h} /\
       i{1} = i_ /\ j{1} = j_ /\ g{1} = g_ /\ h{1} = h_ /\ 
@@ -928,9 +928,6 @@ rewrite !get_offunm; first 3 rewrite rows_offunm cols_offunm lez_maxr //=.
 simplify.
 smt().
 qed.
-
-
-
 
 (************************)
 (* ADD ******************)
@@ -1312,6 +1309,7 @@ simplify.
 simplify.
 rewrite H22.
 rewrite eq_sym in H21.
+rewrite H21.
 simplify.
 rewrite (valid_colp result) //.
 rewrite valid_size // valid_size // _4p /#.

@@ -1136,8 +1136,8 @@ rewrite (addrC c a) -addS.
 by rewrite -addrA subrr addrC add0r.
 qed.
 
-lemma eqview_eqmatrix(m1 m2: matrix):
-   rows m1 = rows m2 /\ 0 <= p < N /\ rows m1 = N /\ cols m1 = N /\
+lemma eqview_eqmatrix(m1 m2: matrix, p: party):
+   rows m1 = rows m2 /\ rows m1 = N /\ cols m1 = N  /\ 0 <= p < rows m1 /\
     view m1 p = view m2 p => m1 = m2.
 proof.
 rewrite _4p.
@@ -1145,14 +1145,11 @@ rewrite eq_matrixP.
 rewrite /view /row.
 rewrite !eq_vectorP.
 progress.
-move: H7 H9.
-rewrite H2 H3.
-progress.
+move: H5. 
+rewrite eq_sym in H4.
+rewrite H4 H1.
 rewrite -!get_row.
 rewrite /view /row.
-move : H5.
-rewrite eq_sym in H4.
-rewrite H4 H3.
 admit.
 qed.    
     
@@ -1165,7 +1162,6 @@ lemma mult_main_secure(p : party) :
       ==>
       view res{1} p = view res{2} p].
 proof.
-
 proc.
 call (mult_secure p).
 call (share_secure p).
@@ -1173,9 +1169,21 @@ call (share_secure p).
 auto.
 rewrite _4p; progress.
 
-print  eqview_eqmatrix.
+rewrite (eqview_eqmatrix result_L result_R p).
+progress.
+smt().
+rewrite _4p; smt().
+rewrite _4p; smt().
+smt().
+smt().
 
-rewrite eqview_eqmatrix result_L result_R.
+rewrite (eqview_eqmatrix result_L0 result_R0 p).
+progress.
+smt().
+rewrite _4p; smt().
+rewrite _4p; smt().
+smt().
+smt().
 
 qed.
 

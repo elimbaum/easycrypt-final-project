@@ -68,7 +68,15 @@ ZR.mulrDl by exact Zmod.ZModpRing.mulrDl.
 *)
 
 
+(* We have four parties. *)
+op N : int.
+axiom _4p : N = 4.
+
 type party = int.
+axiom pbounds : forall (p : party), 0 <= p < 4.
+
+type share = int.
+axiom sbounds : forall (s : share), 0 <= s < 4.
 
 import Mat_A.Matrices.
 import Mat_A.Vectors.
@@ -94,9 +102,7 @@ qed.
 
 (* matrix semantics are [party, share] *)
 
-(* We have four parties. *)
-op N : int.
-axiom _4p : N = 4.
+
 
 (* An unspecified non-zero error value *)
 op err : elem.
@@ -1136,25 +1142,100 @@ rewrite (addrC c a) -addS.
 by rewrite -addrA subrr addrC add0r.
 qed.
 
-lemma eqview_eqmatrix(m1 m2: matrix, p: party):
-   rows m1 = rows m2 /\ rows m1 = N /\ cols m1 = N  /\ 0 <= p < rows m1 /\
-    view m1 p = view m2 p => m1 = m2.
+lemma eqview_eqmatrix(m1 m2: matrix):
+    size m1 = (N, N) /\ size m2 = (N, N) =>
+    ((forall (p : party), 0 <= p < N => view m1 p = view m2 p)
+    <=> m1 = m2).
 proof.
 rewrite _4p.
-rewrite eq_matrixP.
-rewrite /view /row.
-rewrite !eq_vectorP.
 progress.
-move: H5. 
-rewrite eq_sym in H4.
-rewrite H4 H1.
-rewrite -!get_row.
-rewrite /view /row.
-admit.
+rewrite eq_matrixP.
+rewrite /view /row => />.
+rewrite H H0 H1 H2.
+simplify.
+progress.
+rewrite /view /row in H3.
+rewrite -!get_row /row.
+rewrite H3.
+smt().
+smt().
 qed.    
-    
+
+lemma mult_view_secure(p : party) :
+    equiv[F4.mult ~ Sim.mult :
+      size x{1} = (N, N) /\ size x{2} = (N, N) /\ size y{1} = (N, N) /\ size y{2} = (N, N) /\
+      (forall (q : party), view x{1} q = view x{2} q /\ view y{1} q = view y{2} q)
+      ==>
+      view res{1} p = view res{2} p].
+proof.
+proc.
+simplify.
+auto.
+call (inp_secure 0 1 2 3 p) => //=.
+call (inp_secure 0 2 1 3 p) => //=.
+call (inp_secure 0 3 1 2 p) => //=.
+call (inp_secure 1 2 0 3 p) => //=.
+call (inp_secure 1 3 0 2 p) => //=.
+call (inp_secure 2 3 0 1 p).
+simplify.
+skip.
+rewrite _4p /=.
+move => &1 &2.
+elim => size_x1.
+elim => size_x2. 
+elim => size_y1.
+elim => size_y2 view_q.
+rewrite pbounds /=.
+split.
+
+have : x{1}.[0, 1] = x{2}.[0, 1].
+have : view x{1} 0 = view x{2} 0 by rewrite view_q.
+
+rewrite /view /row !eq_vectorP size_offunv size_x1 size_x2 //=.
+rewrite lez_maxr //.
+
+(********** STUCK ***********)
+
+(* have : view y{1} 0 = view y{2} 0 by rewrite view_q.
+have : view x{1} 1 = view x{2} 1 by rewrite view_q.
+have : view y{1} 1 = view y{2} 1 by rewrite view_q. *)
+
+rewrite /view /row !eq_vectorP size_offunv size_x1 size_x2 (* size_y1 size_y2 *) //=.
+rewrite lez_maxr //.
 
 
+
+apply get_offunv.
+
+pose i := 0.
+
+move => v0 rL rR [size_rL [size_rR view_r]].
+split.
+admit.
+move => v1 rL0 rR0 [size_rL0 [size_rR0 view_r0]].
+
+admit.
+
+have v0 : view x{1} 0 = view x{2} 0 /\ view y{1} 0 = view y{2} 0.
+smt().
+move : v0.
+rewrite /view /row !eq_vectorP.
+rewrite size_offunv size_x1 size_x2 size_y1 size_y2 //=.
+rewrite lez_maxr //=.
+admit.
+
+rewrite pbounds /=.
+q progress.
+smt().
+
+have -> : x{1}.[0, 1] = x{2}.[0, 1].
+move : view_q.
+
+
+rewrite -!get_row /row.
+case (p = 0) => [<- //= | pn0].
+smt().
+qed.
 
 lemma mult_main_secure(p : party) :
     equiv[F4.mult_main ~ Sim.mult_main :
@@ -1163,31 +1244,12 @@ lemma mult_main_secure(p : party) :
       view res{1} p = view res{2} p].
 proof.
 proc.
-call (mult_secure p).
+call (mult_view_secure p).
+simplify.
 call (share_secure p).
 call (share_secure p).
 auto.
-rewrite _4p; progress.
-
-rewrite (eqview_eqmatrix result_L result_R p).
-progress.
-smt().
-rewrite _4p; smt().
-rewrite _4p; smt().
-smt().
-smt().
-
-rewrite (eqview_eqmatrix result_L0 result_R0 p).
-progress.
-smt().
-rewrite _4p; smt().
-rewrite _4p; smt().
-smt().
-smt().
-
 qed.
-
-
 
 
 (* annoying, but if we try to smt() this down below without the intermediate lemma,

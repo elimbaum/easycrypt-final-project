@@ -590,15 +590,12 @@ rewrite /view /row 2!cols_offunm lez_maxr // eq_vectorP 2!size_offunv //=.
 move => sh [shgt0 shlt4].
 (* extract matrix *)
 rewrite !get_offunv //=.
-rewrite !get_offunm; first rewrite rows_offunm cols_offunm /#.
-rewrite rows_offunm cols_offunm //=.
+rewrite !get_offunm; first 2 rewrite rows_offunm cols_offunm /#.
 simplify.
 case (sh = 0) => [// | shn0].
 case (sh = 1) => [// | shn1].
-case (sh = 2) => [sh2 | shn2].
-rewrite sh2 //=.
-have sh3 : sh = 3 by smt().
-rewrite sh3 //=.
+case (sh = 2) => [-> //= | shn2].
+have -> //= : sh = 3 by smt().
 
 (*** party 1 ***)
 case (p = 1).
@@ -613,54 +610,43 @@ auto.
 rnd (fun u => x{1} - s0{1} - s2{1} - u).
 auto.
 rewrite _4p.
-progress.
-by rewrite subK.
-by rewrite subK.
+progress; first 2 by rewrite subK.
 (* non-trivial views are equal *)
 rewrite /view /row 2!cols_offunm lez_maxr // eq_vectorP 2!size_offunv //=.
 move => sh [shgt0 shlt4].
 (* extract matrix *)
 rewrite !get_offunv //=.
-rewrite !get_offunm.
-rewrite rows_offunm cols_offunm /#.
-rewrite rows_offunm cols_offunm /#.
+rewrite !get_offunm; first 2 rewrite rows_offunm cols_offunm //.
 simplify.
 case (sh = 0) => [// | shn0].
 case (sh = 1) => [// | shn1].
 case (sh = 2) => [// | shn2].
-have sh3 : sh = 3 by smt().
-rewrite sh3 //=.
-rewrite 2!subdist.
+have -> //= : sh = 3 by smt().
+rewrite 2!subdist. 
 smt(addrA).
 
 (*** party 0 ***)
 swap 1 2.
 seq 2 2 : (={x, s1, s2} /\ p = 0).
 auto.
-rewrite _4p /#.
+rewrite _4p; first smt().
 seq 0 1 : (={x, s1, s2} /\ p = 0).
 auto.
 rnd (fun u => x{1} - s1{1} - s2{1} - u).
 auto.
 rewrite _4p.
-progress.
-by rewrite subK.
-by rewrite subK.
+progress; first 2 by rewrite subK.
 rewrite /view /row 2!cols_offunm lez_maxr // eq_vectorP 2!size_offunv //=.
 move => sh [shgt0 shlt4].
 
 rewrite !get_offunv //=.
-rewrite !get_offunm.
-rewrite rows_offunm cols_offunm /#.
-rewrite rows_offunm cols_offunm /#.
+rewrite !get_offunm; first 2 rewrite rows_offunm cols_offunm //.
 case (sh = 0) => [// | shn0].
 case (sh = 1) => [// | shn1].
 case (sh = 2) => [// | shn2].
-have sh3 : sh = 3 by smt().
-rewrite sh3 //=.
+have -> //= : sh = 3 by smt().
 rewrite 2!subdist.
-rewrite !addS !addrA.
-by rewrite -add_cleanup.
+by rewrite !addS !addrA -add_cleanup.
 qed.
 
 (************************)
@@ -679,39 +665,24 @@ proc.
 auto.
 rewrite _4p.
 progress.
-rewrite rows_offunm _4p lez_maxr // /=.
-rewrite cols_offunm _4p lez_maxr //.
+rewrite rows_offunm _4p lez_maxr //=.
+rewrite cols_offunm _4p lez_maxr //=.
 rewrite get_offunm.
 rewrite rows_offunm cols_offunm /= lez_maxr //.
 by simplify.
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm /= lez_maxr //.
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm /= lez_maxr //.
-by rewrite /= H7 /=.
-
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm /= lez_maxr //.
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm /= lez_maxr //.
-have H6p : 0 <> s by smt().
-by rewrite /= H7 H6p /=.
+rewrite get_offunm; first rewrite rows_offunm cols_offunm /= lez_maxr //=.
+rewrite get_offunm; first rewrite rows_offunm cols_offunm /= lez_maxr //=.
+by rewrite //= H7.
+rewrite get_offunm; first rewrite rows_offunm cols_offunm /= lez_maxr //.
+rewrite get_offunm; first rewrite rows_offunm cols_offunm /= lez_maxr //.
+rewrite eq_sym in H8.
+by rewrite /= H7 H8 /=.
 rewrite /open.
-rewrite get_offunm.
-by rewrite rows_offunm cols_offunm => /=.
-rewrite get_offunm.
-by rewrite rows_offunm cols_offunm => /=.
-rewrite get_offunm.
-by rewrite rows_offunm cols_offunm => /=.
-rewrite get_offunm.
-by rewrite rows_offunm cols_offunm => /=.
+rewrite !get_offunm; first 4 by rewrite rows_offunm cols_offunm //=.
 simplify.
-case (h{hr} = 3) => [//= | hn3].
-by smt(add0r).
-case (h{hr} = 2) => [//= | hn2].
-by smt(add0r).
-case (h{hr} = 1) => [// | hn1].
-by smt(addrC add0r).
+case (h{hr} = 3) => [//= | hn3]; first by smt(add0r).
+case (h{hr} = 2) => [//= | hn2]; first by smt(add0r).
+case (h{hr} = 1) => [// | hn1]; first by smt(addrC add0r).
 have -> : h{hr} = 0 by smt().
 smt(add0r addrC).
 qed.
@@ -745,27 +716,22 @@ progress.
 rewrite rows_addm rowsn rows_offunm /#.
 rewrite cols_addm colsn cols_offunm /#.
 have mrange_a : mrange result a a.
-  rewrite rowsn colsn.
   move : H0.
-  rewrite rows_addm rowsn rows_offunm /#.
-rewrite get_addm.
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm /#.
+  rewrite rowsn colsn rows_addm rowsn rows_offunm /#.
+rewrite get_addm get_offunm; first rewrite rows_offunm cols_offunm.
+smt().
 simplify.
 rewrite diag0.
-smt(add0r).
-smt(add0r).
+rewrite mrange_a.
+by rewrite add0r.
 
 (* columns are equal *)
-rewrite 2!get_addm.
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm.
-rewrite /max.
-simplify.
+rewrite 2!get_addm get_offunm.
+rewrite rows_offunm cols_offunm /max //=.
 move: H0.
-rewrite rows_addm rowsn rows_offunm /#.
+rewrite rows_addm rowsn rows_offunm; first smt().
 rewrite get_offunm.
-rewrite rows_offunm cols_offunm /#.
+rewrite rows_offunm cols_offunm //=.
 simplify.
 have resultp0_eq_result10: mrange result p 0 /\ p <> 0 /\ 0 = 0 => result.[p, 0] = result.[1, 0] by smt().
 rewrite resultp0_eq_result10.
@@ -776,56 +742,38 @@ move: H1.
 rewrite cols_addm colsn cols_offunm /#.
 smt().
 
-rewrite 2!get_addm.
+rewrite 2!get_addm get_offunm.
+rewrite rows_offunm cols_offunm /max //=.
+move : H0 H2.
+rewrite rows_addm rowsn rows_offunm.
+rewrite cols_offunm colsn cols_offunm.
+smt().
 rewrite get_offunm.
-rewrite rows_offunm cols_offunm.
-rewrite /max.
-simplify.
-progress.
-move: H0.
-rewrite rows_addm rowsn rows_offunm /#.
+rewrite rows_offunm cols_offunm /max //=.
 move: H2.
-rewrite cols_offunm colsn cols_offunm /#.
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm.
-rewrite /max.
-simplify.
-progress.
-move: H2.
-rewrite cols_offunm colsn cols_offunm /#.
+rewrite cols_offunm colsn cols_offunm; first smt().
 simplify.
 have resultps_eq_result0s: mrange result p s /\ p <> s /\ s <> 0 => result.[p, s] = result.[0, s].
 progress.
 smt().
 
 rewrite resultps_eq_result0s.
-progress.
-move: H0.
-rewrite rows_addm rowsn rows_offunm /#.
-move: H2.
-rewrite cols_offunm colsn cols_offunm /#.
+move: H0 H2.
+rewrite rows_addm rowsn rows_offunm
+        cols_addm colsn cols_offunm. 
+smt().
 have s_noteq_p: s <> p by smt().
-rewrite H4 s_noteq_p /#.
-(* begin correctness proof *)
+by rewrite H4 s_noteq_p.
 
-rewrite open_linear.
-rewrite /open.
-rewrite get_offunm.
-rewrite cols_offunm rows_offunm /#.
-rewrite get_offunm.
-rewrite cols_offunm rows_offunm /#.
-rewrite get_offunm.
-rewrite cols_offunm rows_offunm /#.
-rewrite get_offunm.
-rewrite cols_offunm rows_offunm /#.
+(* begin correctness proof *)
+rewrite open_linear /open.
+rewrite !get_offunm; first 4 rewrite cols_offunm rows_offunm; smt().
 simplify.
-case: (2 < g_).
- by smt(addrC addrA addNr add0r).
-case: (1 < g_).
- by smt(addrC addrA addNr add0r).
-case: (g_ = 0).
- by smt(addrC addrA addNr add0r).
-smt(addrC addrA addNr add0r).
+case (3 = g_) => [<- //= | ?].
+by smt(addrC addrA addNr add0r).
+case (2 = g_) => [<- //= | ?].
+by smt(addrC addrA addNr add0r).
+case (1 = g_) => [<- //= | ?]; smt(addrC addrA addNr add0r).
 qed.
 
 (* prove inp security:

@@ -1043,7 +1043,7 @@ qed.
 (************************)
 
 
-lemma mult_secure(p p0 p1 p2 p3 p4 p5: party) :
+lemma mult_secure(p: party) :
     equiv[F4.mult ~ Sim.mult :
       ={x, y} /\ 0 <= p < N
       ==>
@@ -1119,6 +1119,8 @@ rewrite x12 y12 rLR0view rLR1view rLR2view rLR3view rLR4view rLR5view.
 smt().
 qed.
 
+
+
 lemma addKl (a b c : zmod) :
     a + b = a + c <=> b = c.
 proof.
@@ -1133,6 +1135,52 @@ proof.
 rewrite (addrC c a) -addS.
 by rewrite -addrA subrr addrC add0r.
 qed.
+
+lemma eqview_eqmatrix(m1 m2: matrix):
+   rows m1 = rows m2 /\ 0 <= p < N /\ rows m1 = N /\ cols m1 = N /\
+    view m1 p = view m2 p => m1 = m2.
+proof.
+rewrite _4p.
+rewrite eq_matrixP.
+rewrite /view /row.
+rewrite !eq_vectorP.
+progress.
+move: H7 H9.
+rewrite H2 H3.
+progress.
+rewrite -!get_row.
+rewrite /view /row.
+move : H5.
+rewrite eq_sym in H4.
+rewrite H4 H3.
+admit.
+qed.    
+    
+
+
+
+lemma mult_main_secure(p : party) :
+    equiv[F4.mult_main ~ Sim.mult_main :
+      ={x, y} /\ 0 <= p < N
+      ==>
+      view res{1} p = view res{2} p].
+proof.
+
+proc.
+call (mult_secure p).
+call (share_secure p).
+call (share_secure p).
+auto.
+rewrite _4p; progress.
+
+print  eqview_eqmatrix.
+
+rewrite eqview_eqmatrix result_L result_R.
+
+qed.
+
+
+
 
 (* annoying, but if we try to smt() this down below without the intermediate lemma,
    smt gets confused. (maybe too much in context) *)

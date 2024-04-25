@@ -1055,20 +1055,43 @@ skip.
 rewrite _4p /=.
 move => &1 &2 xyp.
 split; first by smt().
-elim => view0eq p5c rL rR.
-elim => rLsize.
-elim => rRsize rLRview.
-move => ? ? ? ?.
+
+elim => view5eq.
+elim => p5c1 p5c2 rL5 rR5.
+elim => rL5size.
+elim => rR5size rLR5view.
 split; first by smt().
-move => ????.
+
+elim => view4eq.
+elim => p4c1 p4c2 rL4 rR4.
+elim => rL4size.
+elim => rR4size rLR4view.
 split; first by smt().
-move => ????.
+
+
+elim => view3eq.
+elim => p3c1 p3c2 rL3 rR3.
+elim => rL3size.
+elim => rR3size rLR3view.
 split; first by smt().
-move => ????.
+
+elim => view2eq.
+elim => p2c1 p2c2 rL2 rR2.
+elim => rL2size.
+elim => rR2size rLR2view.
 split; first by smt().
-move => ????.
+
+elim => view1eq.
+elim => p1c1 p1c2 rL1 rR1.
+elim => rL1size.
+elim => rR1size rLR1view.
 split; first by smt().
-move => ????.
+
+elim => view0eq.
+elim => p0c1 p0c2 rL0 rR0.
+elim => rL0size.
+elim => rR0size rLR0view.
+
 rewrite !view_linear.
 rewrite !cols_addm !rows_addm; smt().
 rewrite !cols_addm !rows_addm; smt().
@@ -1082,6 +1105,29 @@ rewrite !cols_addm !rows_addm; smt().
 rewrite !cols_addm !rows_addm; smt().
 rewrite !cols_addm !rows_addm; smt().
 smt().
+
+
+
+
+
+
+(*RUN TILL HERE*)
+
+
+
+
+rewrite /view /row.
+rewrite rL5size rL4size rL3size rL2size rL1size rL0size rR5size rR4size rR3size rR2size rR1size rR0size.
+
+
+case: (p = 0) => [peq0 | pneq0].
+rewrite peq0.
+rewrite !eq_vectorP.
+simplify.
+rewrite !lez_maxr.
+smt().
+
+
 
 qed.
 

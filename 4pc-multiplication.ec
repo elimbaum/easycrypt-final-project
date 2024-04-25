@@ -1119,7 +1119,7 @@ rewrite x12 y12 rLR0view rLR1view rLR2view rLR3view rLR4view rLR5view.
 smt().
 qed.
 
-lemma addK (a b c : zmod) :
+lemma addKl (a b c : zmod) :
     a + b = a + c <=> b = c.
 proof.
 rewrite -addS.
@@ -1137,7 +1137,7 @@ qed.
 (* annoying, but if we try to smt() this down below without the intermediate lemma,
    smt gets confused. (maybe too much in context) *)
 (* in zmod-land, smt can't do this entire thing by itself. do a few cancellations by 
-   hand before handoff. *)
+   hand before handing over to smt to finish. *)
 lemma add_rearrange (t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t13 t14 t15 t16 : zmod) :
     t1 + t2 + t3 + t4 + t5 + t6 + t7 + t8 +
     t9 + t10 + t11 + t12 + t13 + t14 + t15 + t16 = 
@@ -1148,12 +1148,12 @@ rewrite addKr.
 rewrite (addrC (t1 + t2 + t3)).
 rewrite (addrC (t13 + t6)).
 rewrite -!addrA.
-rewrite addK.
+rewrite addKl.
 rewrite !addrA.
 rewrite (addrC (t1 + t2 + t3)).
 rewrite (addrC (t13 + t6 + t11)).
-rewrite -!addrA addK !addrA.
-smt(addrA addrC addK addKr).
+rewrite -!addrA addKl !addrA.
+smt(addrA addrC addKl addKr).
 qed.
 
 lemma valid_size(m : matrix) :
@@ -1384,5 +1384,4 @@ rewrite (valid_colp mx{hr}) //.
 rewrite valid_size // valid_size // _4p /#.
 rewrite (valid_colp my{hr}) //.
 rewrite valid_size // valid_size // _4p /#.
-smt().
 qed.

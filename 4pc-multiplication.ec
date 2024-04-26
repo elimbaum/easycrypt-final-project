@@ -7,10 +7,6 @@ require import Number StdOrder.
 
 require import ZModP. 
 clone import ZModField as Zmod.
-(*
-import Zmod.Sub.
-import Zmod.ZModule.
-import Zmod.ComRing.*)
 
 import Zmod.Sub.
 import Zmod.ZModule.
@@ -47,27 +43,6 @@ ZR.expr0 by exact Zmod.ZModpRing.expr0,
 ZR.exprS by exact Zmod.ZModpRing.exprS,
 ZR.exprN by exact Zmod.ZModpRing.exprN.
 
-(*
-clone DynMatrix as Mat_A with
-type ZR.t <- elem,
-op ZR.zeror  <- Zmod.zero,
-op ZR.oner   <- Zmod.one,
-op ZR.( + )  <- Zmod.( + ),
-op ZR.([-])  <- Zmod.([-]),
-op ZR.( * )  <- Zmod.( * )
-
-proof ZR.addrA by exact Zmod.ZModpRing.addrA,
-ZR.addrC by exact Zmod.ZModpRing.addrC,
-ZR.add0r by exact Zmod.ZModpRing.add0r,
-ZR.addNr by exact Zmod.ZModpRing.addNr,
-ZR.oner_neq0 by exact Zmod.ZModpRing.oner_neq0,
-ZR.mulrA by exact Zmod.ZModpRing.mulrA,
-ZR.mulrC by exact Zmod.ZModpRing.mulrC,
-ZR.mul1r by exact Zmod.ZModpRing.mul1r,
-ZR.mulrDl by exact Zmod.ZModpRing.mulrDl.
-*)
-
-
 (* We have four parties. *)
 op N : int.
 axiom _4p : N = 4.
@@ -99,10 +74,7 @@ by move=> ??; rewrite !randelem1E.
 qed.
 
 (* WARNING: matrices are zero indexed, so we need to have share 0, party 0 *)
-
 (* matrix semantics are [party, share] *)
-
-
 
 (* An unspecified non-zero error value *)
 op err : elem.
@@ -121,10 +93,8 @@ lemma open_linear(mx my : matrix):
 proof.
 rewrite /open.
 rewrite 4!get_addm.
-rewrite !addrA.
-smt(addrC addrA).
+algebra.
 qed.
-
 
 op valid(m : matrix) =
    (* matrix is NxN *)
@@ -413,77 +383,6 @@ rewrite take0.
 smt(addrA addrC add0r).
 qed.
 
-lemma subC (a b : zmod) :
-    a - b = -b + a.
-proof.
-smt(addrA).
-qed.
-
-lemma addS (a b c : zmod) :
-    a - b = c <=> a = b + c.
-proof.
-smt(addrA addrC addNr add0r).
-qed.
-
-lemma subK (a b : zmod) :
-  a - (a - b) = b.
-proof.
-by rewrite addS -addrA addrC addNr add0r.
-qed.
-
-lemma negneg (x : zmod) :
-    - -x = x.
-proof.
-apply asint_inj.
-rewrite !inzmodK modzNm.
-have -> : forall (y : int), -(-y) = y.
-smt().
-rewrite pmod_small.
-rewrite rg_asint.
-trivial.
-qed.
-
-lemma negswap (x y : zmod) :
-    -x = y <=> x = -y.
-proof.
-split; progress; by rewrite negneg.
-qed.
-
-lemma subnegK (a b : zmod) :
-    a - (-b) = a + b.
-proof.
-by rewrite negneg.
-qed.
-
-lemma subrr (x : zmod) :
-    x - x = zero.
-proof.
-smt(addNr).
-qed.
-
-lemma subdist (a b c : zmod):
-    a - (b + c) = a + (-b) + (-c).
-proof.
-rewrite addS.
-rewrite !addrA.
-rewrite (addrC (b + c + a)).
-rewrite !addrA addNr add0r.
-by rewrite addrC addrA addNr add0r.
-qed.
-
-
-lemma negdist (a b : zmod) :
-    -(a + b) = (-a) + (-b).
-proof.
-by rewrite -addS negneg addrC subdist subrr add0r.
-qed.
-
-lemma negnegdist (a b c: zmod) :
-   a -(a - b) = b.
-proof.
-by rewrite subdist negneg subrr add0r.
-qed.
-
 (************************)
 (* SHARE ****************)
 (************************)
@@ -497,12 +396,7 @@ seq 4 : (x = x_ /\ size shares = N /\ sumz_elem shares = x).
 auto.
 progress.
 by rewrite _4p.
-rewrite sum_four //=.
-rewrite addrA.
-rewrite (addrC (s00 + s10 + s20) x{hr}).
-rewrite -addrA.
-rewrite (subrr (s00 + s10 + s20)).
-smt(addrC add0r).
+rewrite sum_four //=; algebra.
 (* valid *)
 auto.
 rewrite _4p.
@@ -529,45 +423,24 @@ rewrite get_offunm; first by rewrite rows_offunm cols_offunm //=.
 simplify.
 (* sums match *)
 rewrite (sum_four shares{hr}) //.
-smt(addrC addrA addNr add0r).
-qed.
-
-lemma simplify_share_secure_1 (x s0 s1 s3 : zmod):
-    x - (s0 + s1 + (x - (s0 + s1 + s3))) = s3.
-proof.
-rewrite !subdist negneg (addrC (x - s0 - s1)) !addrA.
-rewrite addNr add0r.
-rewrite (addrC (-s0 - s1)) !addrA subrr.
-rewrite add0r addNr.
-by rewrite add0r.
-qed.
-
-lemma add_cleanup (a b c x : zmod) :
-    x = a + b + c + x - b - c - a.
-proof.
-rewrite (addrC (a + b + c + x - b - c)).
-rewrite !addrA addNr add0r.
-rewrite (addrC (b + c + x)).
-rewrite !addrA addNr add0r.
-rewrite addrC.
-by rewrite !addrA addNr add0r.
+algebra.
 qed.
 
 (* Prove the sharing scheme is secure.
    For all parties, view looks random.
  *)
-lemma share_secure(p : party) :
+lemma share_secure (p : party):
     equiv[F4.share ~ Sim.share :
-      ={x} /\ 0 <= p < N       
+      ={x}
       ==>
-      size res{1} = (N, N) /\ size res{2} = (N, N) /\ view res{1} p = view res{2} p].
+      size res{1} = (N, N) /\ size res{2} = (N, N) /\
+      view res{1} p = view res{2} p].
 proof.
 proc.
 wp.
-
 (*** party 3 ***) 
-(* easy: all random in both cases *)
 case (p = 3).
+(* easy: all random in both cases *)
 seq 3 3 : (={s0, s1, s2} /\ p = 3); auto. 
 rewrite _4p.
 progress.
@@ -576,7 +449,7 @@ move => sh [shgt0 shlt4].
 (* extract matrix *)
 rewrite !get_offunv //=.
 rewrite !get_offunm; first rewrite rows_offunm cols_offunm //.
-rewrite rows_offunm cols_offunm //.
+rewrite shgt0 shlt4 //=.
 simplify.
 case (sh = 0) => [// | shn0].
 case (sh = 1) => [// | shn1].
@@ -593,7 +466,7 @@ auto.
 rnd (fun u => x{1} - (s0{1} + s1{1} + u)).
 auto.
 rewrite _4p.
-progress; first 2 by rewrite simplify_share_secure_1.
+progress; first 2 by algebra.
 (* non-trivial views are equal *)
 rewrite /view /row 2!cols_offunm lez_maxr // eq_vectorP 2!size_offunv //=.
 move => sh [shgt0 shlt4].
@@ -619,7 +492,7 @@ auto.
 rnd (fun u => x{1} - s0{1} - s2{1} - u).
 auto.
 rewrite _4p.
-progress; first 2 by rewrite subK.
+progress; first 2 by algebra.
 (* non-trivial views are equal *)
 rewrite /view /row 2!cols_offunm lez_maxr // eq_vectorP 2!size_offunv //=.
 move => sh [shgt0 shlt4].
@@ -631,20 +504,19 @@ case (sh = 0) => [// | shn0].
 case (sh = 1) => [// | shn1].
 case (sh = 2) => [// | shn2].
 have -> //= : sh = 3 by smt().
-rewrite 2!subdist. 
-smt(addrA).
+algebra.
 
 (*** party 0 ***)
 swap 1 2.
 seq 2 2 : (={x, s1, s2} /\ p = 0).
 auto.
-rewrite _4p; first smt().
+smt(pbounds).
 seq 0 1 : (={x, s1, s2} /\ p = 0).
 auto.
 rnd (fun u => x{1} - s1{1} - s2{1} - u).
 auto.
 rewrite _4p.
-progress; first 2 by rewrite subK.
+progress; first 2 by algebra.
 rewrite /view /row 2!cols_offunm lez_maxr // eq_vectorP 2!size_offunv //=.
 move => sh [shgt0 shlt4].
 
@@ -654,8 +526,7 @@ case (sh = 0) => [// | shn0].
 case (sh = 1) => [// | shn1].
 case (sh = 2) => [// | shn2].
 have -> //= : sh = 3 by smt().
-rewrite 2!subdist.
-by rewrite !addS !addrA -add_cleanup.
+algebra.
 qed.
 
 (************************)
@@ -690,13 +561,13 @@ by rewrite /= H7 H8 /=.
 rewrite /open.
 rewrite !get_offunm; first 4 by rewrite rows_offunm cols_offunm //=.
 simplify.
-case (h{hr} = 3) => [//= | hn3]; first by smt(add0r).
-case (h{hr} = 2) => [//= | hn2]; first by smt(add0r).
-case (h{hr} = 1) => [// | hn1]; first by smt(addrC add0r).
+case (h{hr} = 3) => [-> //= | hn3]; first by algebra.
+case (h{hr} = 2) => [-> //= | hn2]; first by algebra.
+case (h{hr} = 1) => [-> //= | hn1]; first by algebra.
 have -> : h{hr} = 0 by smt().
-smt(add0r addrC).
+simplify.
+algebra.
 qed.
-
 
 (************************)
 (* INP ******************)
@@ -733,7 +604,7 @@ smt().
 simplify.
 rewrite diag0.
 rewrite mrange_a.
-by rewrite add0r.
+algebra.
 
 (* columns are equal *)
 rewrite 2!get_addm get_offunm.
@@ -779,10 +650,8 @@ by rewrite H4 s_noteq_p.
 rewrite open_linear /open.
 rewrite !get_offunm; first 4 rewrite cols_offunm rows_offunm; smt().
 simplify.
-case (3 = g_) => [<- //= | ?].
-by smt(addrC addrA addNr add0r).
-case (2 = g_) => [<- //= | ?].
-by smt(addrC addrA addNr add0r).
+case (3 = g_) => [<- //= | ?]; first smt(addrC addrA addNr add0r).
+case (2 = g_) => [<- //= | ?]; first smt(addrC addrA addNr add0r).
 case (1 = g_) => [<- //= | ?]; smt(addrC addrA addNr add0r).
 qed.
 
@@ -892,7 +761,7 @@ seq 1 1 : (={x,h,i,j,g} /\ xfake{2} = x{2} - r{1} /\
   p = g_ /\ g_ = g{2} /\ h_ = h{2} /\ i_ = i{2} /\ j_ = j{2} /\ uniq [i_; j_; g_; h_]).
 rnd (fun u => x{2} - u).
 auto.
-progress; first 2 by rewrite subK.
+progress; first 2 by algebra.
 sp.
 (* jmp call *)
 inline; auto.
@@ -1028,21 +897,6 @@ auto; progress.
 rewrite !view_linear //=; smt().
 qed.
 
-(*
-(* TODO: maybe do something like this to simplify all of the get/rows/cols proof steps below *)
-lemma offunm_unwrap (i, j : party, f : party -> int -> int):
-    0 <= i < N /\ 0 <= j < N => (offunm (fun(x y) => f x y, N, N)).[i, j] = f i j.
-proof.
-progress.
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm H H1 /=.
-move : H0 H2.
-by rewrite _4p.
-by simplify.
-qed.
-*)
-
-
 
 (************************)
 (* MULT *****************)
@@ -1071,40 +925,22 @@ elim.
 elim => x12 y12 pbounds.
 split; first by smt().
 
-elim => view5eq.
-elim => p5c1 p5c2 rL5 rR5.
-elim => rL5size.
-elim => rR5size rLR5view.
+elim => view5eq [p5c1 p5c2 rL5 rR5 [rL5size [rR5size rLR5view]]].
 split; first by smt().
 
-elim => view4eq.
-elim => p4c1 p4c2 rL4 rR4.
-elim => rL4size.
-elim => rR4size rLR4view.
+elim => view4eq [p4c1 p4c2 rL4 rR4 [rL4size [rR4size rLR4view]]].
 split; first by smt().
 
-elim => view3eq.
-elim => p3c1 p3c2 rL3 rR3.
-elim => rL3size.
-elim => rR3size rLR3view.
+elim => view3eq [p3c1 p3c2 rL3 rR3 [rL3size [rR3size rLR3view]]].
 split; first by smt().
 
-elim => view2eq.
-elim => p2c1 p2c2 rL2 rR2.
-elim => rL2size.
-elim => rR2size rLR2view.
+elim => view2eq [p2c1 p2c2 rL2 rR2 [rL2size [rR2size rLR2view]]].
 split; first by smt().
 
-elim => view1eq.
-elim => p1c1 p1c2 rL1 rR1.
-elim => rL1size.
-elim => rR1size rLR1view.
+elim => view1eq [p1c1 p1c2 rL1 rR1 [rL1size [rR1size rLR1view]]].
 split; first by smt().
 
-elim => view0eq.
-elim => p0c1 p0c2 rL0 rR0.
-elim => rL0size.
-elim => rR0size rLR0view.
+elim => view0eq [p0c1 p0c2 rL0 rR0 [rL0size [rR0size rLR0view]]].
 
 rewrite !view_linear.
 rewrite !cols_addm !rows_addm; smt().
@@ -1125,153 +961,53 @@ rewrite x12 y12 rLR0view rLR1view rLR2view rLR3view rLR4view rLR5view.
 smt().
 qed.
 
-
-
-lemma addKl (a b c : zmod) :
-    a + b = a + c <=> b = c.
-proof.
-rewrite -addS.
-rewrite addrC addrA.
-by rewrite addNr add0r.
-qed.
-
-lemma addKr (a b c : zmod) :
-    b + a = c + a <=> b = c.
-proof.
-rewrite (addrC c a) -addS.
-by rewrite -addrA subrr addrC add0r.
-qed.
-
-lemma eqview_eqmatrix(m1 m2: matrix):
-    size m1 = (N, N) /\ size m2 = (N, N) =>
-    ((forall (p : party), 0 <= p < N => view m1 p = view m2 p)
-    <=> m1 = m2).
+(* possibly use for mult_main_secure, should we ever get that working. *)
+lemma view12_equiv (x1 x2 : matrix, i : party, j : int) :
+    (size x1 = (N, N) /\ size x2 = (N, N) /\
+    0 <= i < N /\ 0 <= j < N /\
+    forall (q : party), view x1 q = view x2 q)
+    =>
+    x1.[i, j] = x2.[i, j].
 proof.
 rewrite _4p.
 progress.
-rewrite eq_matrixP.
-rewrite /view /row => />.
-rewrite H H0 H1 H2.
-simplify.
-progress.
-rewrite /view /row in H3.
-rewrite -!get_row /row.
-rewrite H3.
-smt().
-smt().
-qed.    
-
-lemma mult_view_secure(p : party) :
-    equiv[F4.mult ~ Sim.mult :
-      size x{1} = (N, N) /\ size x{2} = (N, N) /\ size y{1} = (N, N) /\ size y{2} = (N, N) /\
-      (forall (q : party), view x{1} q = view x{2} q /\ view y{1} q = view y{2} q)
-      ==>
-      view res{1} p = view res{2} p].
-proof.
-proc.
-simplify.
-auto.
-call (inp_secure 0 1 2 3 p) => //=.
-call (inp_secure 0 2 1 3 p) => //=.
-call (inp_secure 0 3 1 2 p) => //=.
-call (inp_secure 1 2 0 3 p) => //=.
-call (inp_secure 1 3 0 2 p) => //=.
-call (inp_secure 2 3 0 1 p).
-simplify.
-skip.
-rewrite _4p /=.
-move => &1 &2.
-elim => size_x1.
-elim => size_x2. 
-elim => size_y1.
-elim => size_y2 view_q.
-rewrite pbounds /=.
-split.
-
-have : x{1}.[0, 1] = x{2}.[0, 1].
-have : view x{1} 0 = view x{2} 0 by rewrite view_q.
-
-rewrite /view /row !eq_vectorP size_offunv size_x1 size_x2 //=.
-rewrite lez_maxr //.
-
-(********** STUCK ***********)
-
-(* have : view y{1} 0 = view y{2} 0 by rewrite view_q.
-have : view x{1} 1 = view x{2} 1 by rewrite view_q.
-have : view y{1} 1 = view y{2} 1 by rewrite view_q. *)
-
-rewrite /view /row !eq_vectorP size_offunv size_x1 size_x2 (* size_y1 size_y2 *) //=.
-rewrite lez_maxr //.
-
-
-
-apply get_offunv.
-
-pose i := 0.
-
-move => v0 rL rR [size_rL [size_rR view_r]].
-split.
-admit.
-move => v1 rL0 rR0 [size_rL0 [size_rR0 view_r0]].
-
-admit.
-
-have v0 : view x{1} 0 = view x{2} 0 /\ view y{1} 0 = view y{2} 0.
-smt().
-move : v0.
-rewrite /view /row !eq_vectorP.
-rewrite size_offunv size_x1 size_x2 size_y1 size_y2 //=.
-rewrite lez_maxr //=.
-admit.
-
-rewrite pbounds /=.
-q progress.
-smt().
-
-have -> : x{1}.[0, 1] = x{2}.[0, 1].
-move : view_q.
-
-
-rewrite -!get_row /row.
-case (p = 0) => [<- //= | pn0].
-smt().
+have : view x1 i = view x2 i.
+by rewrite H7.
+rewrite /view /row !eq_vectorP size_offunv H0 H2 lez_maxr // => vx1.
+have : (offunv (fun (i0 : int) => x1.[i, i0], 4)).[j] = 
+       (offunv (fun (i0 : int) => x2.[i, i0], 4)).[j] by smt().
+by rewrite !get_offunv.
 qed.
 
-lemma mult_main_secure(p : party) :
+lemma size_view (m : matrix, p : party) :
+    size (view m p) = cols m.
+proof.
+by rewrite /view size_row.
+qed.
+
+(* full share-multiply protocol secure *)
+(* does not appear to be provable right now, because mult_secure requires the input
+   matrix to be equal, which, after a simulator run of share, is not true.
+ *)
+lemma mult_main_secure :
     equiv[F4.mult_main ~ Sim.mult_main :
-      ={x, y} /\ 0 <= p < N
+      ={x, y}
       ==>
       view res{1} p = view res{2} p].
 proof.
 proc.
-call (mult_view_secure p).
-simplify.
+seq 2 2 : (view mx{1} p = view mx{2} p /\ view my{1} p = view my{2} p
+           /\ size mx{1} = (N, N) /\ size my{1} = (N, N)
+           /\ size mx{2} = (N, N) /\ size my{2} = (N, N)).
 call (share_secure p).
 call (share_secure p).
 auto.
-qed.
-
-
-(* annoying, but if we try to smt() this down below without the intermediate lemma,
-   smt gets confused. (maybe too much in context) *)
-(* in zmod-land, smt can't do this entire thing by itself. do a few cancellations by 
-   hand before handing over to smt to finish. *)
-lemma add_rearrange (t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t13 t14 t15 t16 : zmod) :
-    t1 + t2 + t3 + t4 + t5 + t6 + t7 + t8 +
-    t9 + t10 + t11 + t12 + t13 + t14 + t15 + t16 = 
-    t13 + t6 + t4 + t11 + t5 + t14 + t2 + t9 +
-    t3 +  t1 + t15 + t7 + t12 + t10 + t8 + t16.
-proof.
-rewrite addKr.
-rewrite (addrC (t1 + t2 + t3)).
-rewrite (addrC (t13 + t6)).
-rewrite -!addrA.
-rewrite addKl.
-rewrite !addrA.
-rewrite (addrC (t1 + t2 + t3)).
-rewrite (addrC (t13 + t6 + t11)).
-rewrite -!addrA addKl !addrA.
-smt(addrA addrC addKl addKr).
+call (mult_secure p).
+auto.
+rewrite _4p pbounds //=.
+progress.
+admit.
+admit.
 qed.
 
 lemma valid_size(m : matrix) :
@@ -1308,14 +1044,7 @@ smt().
 trivial.
 qed.
 
-lemma mulrDr (x y z : zmod): x * (y + z) = (x * y) + (x * z).
-proof.
-rewrite ComRing.mulrC.
-rewrite ComRing.mulrDl.
-smt(ComRing.mulrC).
-qed.
-
-(* Prove multiplication is correct *)
+(* Prove pre-shared multiplication is correct *)
 lemma mult_correct(x_ y_ : elem) :
     hoare[F4.mult_main : x = x_ /\ y = y_ ==> open res = x_ * y_ /\ valid res].
 proof.
@@ -1331,7 +1060,7 @@ seq 1 : (open mx = x_ /\ size mx = (N, N) /\ valid mx /\
 call (share_correct y_).
 auto => />; progress; smt(_4p).
 
-(* prove multiplication is correct *)
+(* prove share + multiply is correct *)
 inline F4.mult.
 wp; sp.
 exists* mx, my.
@@ -1358,12 +1087,7 @@ rewrite get_offunm; first by rewrite cols_offunm rows_offunm lez_maxr.
 rewrite get_offunm; first by rewrite cols_offunm rows_offunm lez_maxr.
 rewrite get_offunm; first by rewrite cols_offunm rows_offunm lez_maxr.
 simplify.
-rewrite !addrA.
-rewrite !ComRing.mulrDl.
-rewrite !mulrDr.
-rewrite !addrA.
-rewrite add_rearrange. 
-by simplify.
+algebra.
 
 (* done correctness... now validity proof *)
 (* 1. prove size correct (N x N) *)

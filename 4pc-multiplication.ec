@@ -1228,9 +1228,7 @@ rewrite _4p.
 progress.
 byequiv => //.
 conseq  GReal_GIdeal.
-progress.
-rewrite _4p.
-smt().
+progress; smt(_4p).
 qed.
 
 end section.
@@ -1246,6 +1244,5 @@ lemma Security (Adv <: ADV{}) &m :
 proof.
 rewrite _4p.
 progress.
-apply (Sec Adv &m).
-smt(_4p).
+apply (Sec Adv &m); smt(_4p).
 qed.

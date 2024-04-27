@@ -999,11 +999,12 @@ trivial.
 qed.
 
 (* Prove pre-shared multiplication is correct *)
-lemma mult_correct(x_ y_ : elem) :
-    hoare[F4.mult_main : x = x_ /\ y = y_ ==> open res = x_ * y_ /\ valid res].
+lemma mult_correct(mx_ my_ : matrix) :
+    hoare[F4.mult : mx = mx_ /\ my = my_ ==> open res = open mx_ * open my_ /\ valid res].
 proof.
 proc.
 (* expand each sharing, one variable at a time *)
+(*
 seq 1 : (open mx = x_ /\ y = y_ /\ size mx = (N, N) /\ valid mx).
 auto.
 call (share_correct x_).
@@ -1016,6 +1017,7 @@ auto => />; progress; smt(_4p).
 
 (* prove share + multiply is correct *)
 inline F4.mult.
+*)
 wp; sp.
 exists* mx, my.
 elim* => mx my.
@@ -1033,7 +1035,7 @@ auto; rewrite _4p. progress.
 (* prove two sides open to the same matrix *)
 rewrite 6!open_linear.
 (* results from INP *)
-rewrite H6 H8 H10 H12 H14 H16.
+rewrite H0 H2 H4 H6 H8 H10.
 (* local multiply result *)
 rewrite /open.
 rewrite get_offunm; first by rewrite cols_offunm rows_offunm lez_maxr.
@@ -1057,13 +1059,13 @@ rewrite _4p //.
 (* 2. prove diag zero *)
 rewrite 6!get_addm.
 have alt4 : a < 4.
-move : H18.
+move : H12.
 rewrite 6!rows_addm.
 rewrite valid_size // valid_size // valid_size //
         valid_size // valid_size // valid_size //.
 rewrite _4p //.
 
-clear H18 H20.
+clear H12 H14.
 rewrite valid_diag0 // valid_diag0 // valid_diag0 //
         valid_diag0 // valid_diag0 // valid_diag0 //.
 rewrite get_offunm /= //.

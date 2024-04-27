@@ -162,17 +162,6 @@ module Sim = {
         if p_ = s then zero else (nth err shares s)), N, N);
   }
 
-(*
-  proc jmp(x : elem, si sj g h : party) : matrix = {
-    (* QUESTION: what, if anything, should the simulator do here? *)
-    var mjmp : matrix;
-
-    mjmp <- offunm ((fun p s =>
-        if s = p then zero else
-        if s = h then x else zero), N, N);
-    return mjmp;
-  }
-*)
 
   proc inp(x : elem, i j g h : party) : matrix = {
     var r, xh, xfake: elem;
@@ -222,20 +211,6 @@ module Sim = {
     (* elementwise addition *)
     return m01 + m02 + m03 + m12 + m13 + m23 + mlocal;   
   }
-
-(*
-  proc mult_main(x y : elem) : matrix = {
-    var mx, my, mz : matrix;
-
-    mx <@ share(x);
-    my <@ share(y);
-
-    mz <@ mult(mx, my);
-
-    return mz;
-  }
-
-*)
 
   proc add(x y : elem) : matrix = {
     var mx, my : matrix;
@@ -347,20 +322,6 @@ module F4 = {
     (* elementwise addition *)
     return m01 + m02 + m03 + m12 + m13 + m23 + mlocal;   
   }
-
-
-
-  proc mult_main(x y : elem) : matrix = {
-    var mx, my, mz : matrix;
-
-    mx <@ share(x);
-    my <@ share(y);
-
-    mz <@ mult(mx, my);
-
-    return mz;
-  }
-
 
   proc add_main(x y : elem) : matrix = {
     var mx, my, mz : matrix;
@@ -910,60 +871,6 @@ qed.
 (* MULT *****************)
 (************************)
 
-(*
-
-(* possibly use for mult_main_secure, should we ever get that working. *)
-lemma view12_equiv (x1 x2 : matrix, i : party, j : int) :
-    (size x1 = (N, N) /\ size x2 = (N, N) /\
-    0 <= i < N /\ 0 <= j < N /\
-    forall (q : party), view x1 q = view x2 q)
-    =>
-    x1.[i, j] = x2.[i, j].
-proof.
-rewrite _4p.
-progress.
-have : view x1 i = view x2 i.
-by rewrite H7.
-rewrite /view /row !eq_vectorP size_offunv H0 H2 lez_maxr // => vx1.
-have : (offunv (fun (i0 : int) => x1.[i, i0], 4)).[j] = 
-       (offunv (fun (i0 : int) => x2.[i, i0], 4)).[j] by smt().
-by rewrite !get_offunv.
-qed.
-
-lemma size_view (m : matrix, p : party) :
-    size (view m p) = cols m.
-proof.
-by rewrite /view size_row.
-qed.
-
-
-(* full share-multiply protocol secure *)
-(* does not appear to be provable right now, because mult_secure requires the input
-   matrix to be equal, which, after a simulator run of share, is not true.
- *)
-lemma mult_main_secure :
-    equiv[F4.mult_main ~ Sim.mult_main :
-      ={x, y}
-      ==>
-      view res{1} p = view res{2} p].
-proof.
-proc.
-seq 2 2 : (view mx{1} p = view mx{2} p /\ view my{1} p = view my{2} p
-           /\ size mx{1} = (N, N) /\ size my{1} = (N, N)
-           /\ size mx{2} = (N, N) /\ size my{2} = (N, N)).
-call (share_secure p).
-call (share_secure p).
-auto.
-call (mult_secure p).
-auto.
-rewrite _4p pbounds //=.
-progress.
-admit.
-admit.
-qed.
-*)
-
-
 lemma valid_size(m : matrix) :
     valid m => rows m = N /\ cols m = N.
 proof.
@@ -999,24 +906,12 @@ trivial.
 qed.
 
 (* Prove pre-shared multiplication is correct *)
-lemma mult_correct(x_ y_ : elem) :
-    hoare[F4.mult_main : x = x_ /\ y = y_ ==> open res = x_ * y_ /\ valid res].
+lemma mult_correct(mx_ my_ : matrix) :
+    hoare[F4.mult : mx = mx_ /\ my = my_ /\ valid mx_ /\ valid my_ ==> 
+                       open res = open mx_ * open my_ /\ valid res].
 proof.
 proc.
-(* expand each sharing, one variable at a time *)
-seq 1 : (open mx = x_ /\ y = y_ /\ size mx = (N, N) /\ valid mx).
-auto.
-call (share_correct x_).
-auto => />; progress; smt(_4p).
-
-seq 1 : (open mx = x_ /\ size mx = (N, N) /\ valid mx /\
-         open my = y_ /\ size my = (N, N) /\ valid my).
-call (share_correct y_).
-auto => />; progress; smt(_4p).
-
-(* prove share + multiply is correct *)
-inline F4.mult.
-wp; sp.
+wp.
 exists* mx, my.
 elim* => mx my.
 
@@ -1033,7 +928,7 @@ auto; rewrite _4p. progress.
 (* prove two sides open to the same matrix *)
 rewrite 6!open_linear.
 (* results from INP *)
-rewrite H6 H8 H10 H12 H14 H16.
+rewrite H2 H4 H6 H8 H10 H12.
 (* local multiply result *)
 rewrite /open.
 rewrite get_offunm; first by rewrite cols_offunm rows_offunm lez_maxr.
@@ -1057,13 +952,13 @@ rewrite _4p //.
 (* 2. prove diag zero *)
 rewrite 6!get_addm.
 have alt4 : a < 4.
-move : H18.
+move : H14.
 rewrite 6!rows_addm.
 rewrite valid_size // valid_size // valid_size //
         valid_size // valid_size // valid_size //.
 rewrite _4p //.
 
-clear H18 H20.
+clear H14 H16.
 rewrite valid_diag0 // valid_diag0 // valid_diag0 //
         valid_diag0 // valid_diag0 // valid_diag0 //.
 rewrite get_offunm /= //.
@@ -1071,7 +966,7 @@ smt(zeroE).
 
 (* 3a. prove columns consistent *)
 have plt4 : p < 4.
-move : H18.
+move : H14.
 rewrite 6!rows_addm.
 rewrite valid_size // valid_size // valid_size //
         valid_size // valid_size // valid_size //.
@@ -1122,14 +1017,14 @@ trivial.
 
 (* 3b. prove the other columns are consistent *)
 have plt4 : p < 4.
-move : H18.
+move : H14.
 rewrite 6!rows_addm.
 rewrite valid_size // valid_size // valid_size //
         valid_size // valid_size // valid_size //.
 rewrite _4p rows_offunm lez_maxr // lez_maxr.
 
 have slt4 : s < 4.
-move : H20.
+move : H16.
 rewrite 6!cols_addm.
 rewrite valid_size // valid_size // valid_size //
         valid_size // valid_size // valid_size //.
@@ -1160,9 +1055,9 @@ rewrite cols_offunm rows_offunm.
 trivial.
 simplify.
 simplify.
-rewrite H22.
-rewrite eq_sym in H21.
-rewrite H21.
+rewrite H18.
+rewrite eq_sym in H17.
+rewrite H17.
 simplify.
 rewrite (valid_colp result) //.
 rewrite valid_size // valid_size // _4p /#.
@@ -1186,7 +1081,7 @@ qed.
 lemma mult_secure(p: party) :
     equiv[F4.mult ~ Sim.mult :
       ={mx, my} /\ 0 <= p < N
-      ==>
+      ==> 
       view res{1} p = view res{2} p].
 proof.
 proc.
@@ -1243,3 +1138,114 @@ qed.
 
 
 
+(************************)
+(* GAME *****************)
+(************************)
+
+module type ADV = {
+
+  (* Ask adversary for matrix mx *)
+  proc getmx(): matrix
+  
+  (* Ask adversary for matrix my *)
+  proc getmy(): matrix
+
+  (* Adversary gets a view for a party p of the multiplication result matrix and
+  asked to differentiate between the real and the ideal game. *)
+  proc put(view_mz : vector) : bool
+}.
+
+module GReal (Adv : ADV) = {
+
+  proc main(): bool = {
+    
+    var mx, my, mz : matrix;
+    var b : bool;
+
+    mx <@ Adv.getmx();  (* Gets matrix mx from the adversary *)
+    my <@ Adv.getmy();  (* Gets matrix my from the adversary *)
+    
+    mz <@ F4.mult(mx, my); (* Calls the mult proc of the Fantastic4 protocol *)
+
+    b <@ Adv.put(view mz p); (* View for a party p of the multiplication result is given to the adversary 
+                              which chooses a boolean judgement for game's result*)
+
+    return b;  (* returns the result of the judgement *)
+
+  }
+}.
+
+
+
+module GIdeal (Adv : ADV) = {
+
+  proc main(): bool = {
+    
+    var mx, my, mz : matrix;
+    var b : bool;
+
+    mx <@ Adv.getmx(); (* Gets matrix mx from the adversary *)
+    my <@ Adv.getmy();  (* Gets matrix my from the adversary *)
+
+    mz <@ Sim.mult(mx, my); (* Calls the mult proc of Simulator *)
+
+    b <@ Adv.put(view mz p); (* View for a party p of the multiplication result is given to the adversary 
+                              which chooses a boolean judgement for game's result*)
+
+    return b; (* returns the result of the judgement *)
+
+  }
+}.
+
+
+section.
+
+(*There are no global states maintained in any of the modules*)
+declare module Adv <: ADV{}.
+
+local lemma GReal_GIdeal :
+    equiv[GReal(Adv).main ~ GIdeal(Adv).main:
+          ={glob Adv} /\ 0 <= p < N ==> ={res}].
+proof.
+proc.
+seq 2 2 : (={glob Adv, mx, my} /\ 0 <= p < N).
+call (_: true).
+call (_: true).
+auto.
+seq 1 1: (={glob Adv, mx, my} /\ 0 <= p < N /\ view mz{1} p = view mz{2} p). 
+call (mult_secure p).
+auto.
+call (_ : true).
+auto.
+qed.
+
+lemma Sec &m :
+    0 <= p < N => 
+    Pr[GReal(Adv).main() @ &m : res] = 
+    Pr[GIdeal(Adv).main() @ &m: res].
+proof.
+rewrite _4p.
+progress.
+byequiv => //.
+conseq  GReal_GIdeal.
+progress.
+rewrite _4p.
+smt().
+qed.
+
+end section.
+
+
+(* The security theorem which states that the adversary is completely unable
+to distinguish between the two games.*)
+
+lemma Security (Adv <: ADV{}) &m :
+    0 <= p < N => 
+    Pr[GReal(Adv).main() @ &m : res] = 
+    Pr[GIdeal(Adv).main() @ &m: res].
+proof.
+rewrite _4p.
+progress.
+apply (Sec Adv &m).
+smt(_4p).
+qed.

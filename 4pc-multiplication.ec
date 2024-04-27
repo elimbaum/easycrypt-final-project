@@ -227,7 +227,7 @@ module F4 = {
   
   (* dealer has value x and wants to share it with all other parties *)
   proc share(x : elem) : matrix = {
-    var s0, s1, s2, s_ : elem;
+    var s0, s1, s2: elem;
 
     var shares : elem list;
 

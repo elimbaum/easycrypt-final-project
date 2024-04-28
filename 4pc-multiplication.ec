@@ -1139,7 +1139,7 @@ qed.
 
 
 (************************)
-(* GAME *****************)
+(* GAME 1 ***************)
 (************************)
 
 module type ADV = {
@@ -1157,7 +1157,7 @@ module type ADV = {
 
 module GReal (Adv : ADV) = {
 
-  proc main(): bool = {
+  proc mult_main(): bool = {
     
     var mx, my, mz : matrix;
     var b : bool;
@@ -1173,13 +1173,48 @@ module GReal (Adv : ADV) = {
     return b;  (* returns the result of the judgement *)
 
   }
+
+  proc mult_inp(): bool = {
+    
+    var mx, my, m23, m13, m12, m03, m02, m01, mlocal, mresult: matrix;
+    var b1, b2,b3, b4, b5, b6, b7, b8, b9 : bool;
+
+    mx <@ Adv.getmx();  (* Gets matrix mx from the adversary *)
+    my <@ Adv.getmy();  (* Gets matrix my from the adversary *)
+
+    
+    m23 <@ F4.inp(mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1], 2, 3, 0, 1);
+    b1 <@ Adv.put(view m23 p);
+    m13 <@ F4.inp(mx.[0, 2] * my.[1, 0] + mx.[1, 0] * my.[0, 2], 1, 3, 0, 2);
+    b2 <@ Adv.put(view m13 p);
+    m12 <@ F4.inp(mx.[0, 3] * my.[1, 0] + mx.[1, 0] * my.[0, 3], 1, 2, 0, 3);
+    b3 <@ Adv.put(view m12 p);
+    m03 <@ F4.inp(mx.[0, 2] * my.[0, 1] + mx.[0, 1] * my.[0, 2], 0, 3, 1, 2);
+    b4 <@ Adv.put(view m03 p);
+    m02 <@ F4.inp(mx.[0, 3] * my.[0, 1] + mx.[0, 1] * my.[0, 3], 0, 2, 1, 3);
+    b5 <@ Adv.put(view m02 p);
+    m01 <@ F4.inp(mx.[0, 3] * my.[0, 2] + mx.[0, 2] * my.[0, 3], 0, 1, 2, 3);
+    b6 <@ Adv.put(view m01 p);
+
+    mlocal <- offunm ((fun p s => 
+      if s = p then zero else mx.[p, s] * my.[p, s]), N, N);
+    b7 <@ Adv.put(view mlocal p);
+
+    mresult <- m01 + m02 + m03 + m12 + m13 + m23 + mlocal; 
+    b8 <@ Adv.put(view mresult p);
+
+    b9 <- b1 /\ b2 /\ b3 /\ b4 /\ b5 /\ b6 /\ b7 /\ b8; 
+    
+    return b9;  (* returns the result of the judgement *)
+
+  }
 }.
 
 
 
 module GIdeal (Adv : ADV) = {
 
-  proc main(): bool = {
+  proc mult_main(): bool = {
     
     var mx, my, mz : matrix;
     var b : bool;
@@ -1195,6 +1230,42 @@ module GIdeal (Adv : ADV) = {
     return b; (* returns the result of the judgement *)
 
   }
+
+
+  proc mult_inp(): bool = {
+    
+    var mx, my, m23, m13, m12, m03, m02, m01, mlocal, mresult: matrix;
+    var b1, b2,b3, b4, b5, b6, b7, b8, b9 : bool;
+
+    mx <@ Adv.getmx();  (* Gets matrix mx from the adversary *)
+    my <@ Adv.getmy();  (* Gets matrix my from the adversary *)
+
+    
+    m23 <@ Sim.inp(mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1], 2, 3, 0, 1);
+    b1 <@ Adv.put(view m23 p);
+    m13 <@ Sim.inp(mx.[0, 2] * my.[1, 0] + mx.[1, 0] * my.[0, 2], 1, 3, 0, 2);
+    b2 <@ Adv.put(view m13 p);
+    m12 <@ Sim.inp(mx.[0, 3] * my.[1, 0] + mx.[1, 0] * my.[0, 3], 1, 2, 0, 3);
+    b3 <@ Adv.put(view m12 p);
+    m03 <@ Sim.inp(mx.[0, 2] * my.[0, 1] + mx.[0, 1] * my.[0, 2], 0, 3, 1, 2);
+    b4 <@ Adv.put(view m03 p);
+    m02 <@ Sim.inp(mx.[0, 3] * my.[0, 1] + mx.[0, 1] * my.[0, 3], 0, 2, 1, 3);
+    b5 <@ Adv.put(view m02 p);
+    m01 <@ Sim.inp(mx.[0, 3] * my.[0, 2] + mx.[0, 2] * my.[0, 3], 0, 1, 2, 3);
+    b6 <@ Adv.put(view m01 p);
+
+    mlocal <- offunm ((fun p s => 
+      if s = p then zero else mx.[p, s] * my.[p, s]), N, N);
+    b7 <@ Adv.put(view mlocal p);
+
+    mresult <- m01 + m02 + m03 + m12 + m13 + m23 + mlocal; 
+    b8 <@ Adv.put(view mresult p);
+
+    b9 <- b1 /\ b2 /\ b3 /\ b4 /\ b5 /\ b6 /\ b7 /\ b8; 
+    
+    return b9;  (* returns the result of the judgement *)
+
+  }
 }.
 
 
@@ -1204,7 +1275,7 @@ section.
 declare module Adv <: ADV{}.
 
 local lemma GReal_GIdeal :
-    equiv[GReal(Adv).main ~ GIdeal(Adv).main:
+    equiv[GReal(Adv).mult_main ~ GIdeal(Adv).mult_main:
           ={glob Adv} /\ 0 <= p < N ==> ={res}].
 proof.
 proc.
@@ -1219,10 +1290,10 @@ call (_ : true).
 auto.
 qed.
 
-lemma Sec &m :
+lemma Sec_Mult_Main &m :
     0 <= p < N => 
-    Pr[GReal(Adv).main() @ &m : res] = 
-    Pr[GIdeal(Adv).main() @ &m: res].
+    Pr[GReal(Adv).mult_main() @ &m : res] = 
+    Pr[GIdeal(Adv).mult_main() @ &m: res].
 proof.
 rewrite _4p.
 progress.
@@ -1239,10 +1310,221 @@ to distinguish between the two games.*)
 
 lemma Security (Adv <: ADV{}) &m :
     0 <= p < N => 
-    Pr[GReal(Adv).main() @ &m : res] = 
-    Pr[GIdeal(Adv).main() @ &m: res].
+    Pr[GReal(Adv).mult_main() @ &m : res] = 
+    Pr[GIdeal(Adv).mult_main() @ &m: res].
 proof.
 rewrite _4p.
 progress.
-apply (Sec Adv &m); smt(_4p).
+apply (Sec_Mult_Main Adv &m); smt(_4p).
+qed.
+
+
+
+section.
+
+
+(*There are no global states maintained in any of the modules*)
+declare module Adv <: ADV{}.
+
+local lemma GReal_GIdeal:
+    equiv[GReal(Adv).mult_inp ~ GIdeal(Adv).mult_inp:
+          ={glob Adv} /\ 0 <= p < N ==> ={res}].
+proof.
+proc.
+wp.
+seq 2 2 : (={glob Adv, mx, my} /\ 0 <= p < N).
+call (_: true).
+call (_: true).
+auto.
+
+seq 2 2: (={glob Adv, mx, my, b1} /\ 0 <= p < N /\ 
+           view m23{1} p = view m23{2} p /\ 
+           rows m23{1} = rows m23{2} /\ rows m23{1} = N  /\ 
+           cols m23{1} = cols m23{2} /\ cols m23{1} = N). 
+call (_ : true).
+call (inp_secure 2 3 0 1 p).
+auto; smt(_4p).
+
+seq 2 2: (={glob Adv, mx, my, b1, b2} /\ 0 <= p < N /\ 
+            view m23{1} p = view m23{2} p /\ 
+            rows m23{1} = rows m23{2}  /\ rows m23{1} = N /\ 
+            cols m23{1} = cols m23{2} /\ cols m23{1} = N /\
+            view m13{1} p = view m13{2} p /\ 
+            rows m13{1} = rows m13{2}  /\ rows m13{1} = N /\ 
+            cols m13{1} = cols m13{2} /\ cols m13{1} = N). 
+call (_ : true).
+call (inp_secure 1 3 0 2 p).
+auto; smt(_4p).
+
+seq 2 2: (={glob Adv, mx, my, b1, b2, b3} /\ 0 <= p < N /\
+          view m23{1} p = view m23{2} p /\ 
+          rows m23{1} = rows m23{2}  /\ rows m23{1} = N /\ 
+          cols m23{1} = cols m23{2} /\ cols m23{1} = N /\
+          view m13{1} p = view m13{2} p /\ 
+          rows m13{1} = rows m13{2}  /\ rows m13{1} = N /\ 
+          cols m13{1} = cols m13{2} /\ cols m13{1} = N /\
+          view m12{1} p = view m12{2} p /\ 
+          rows m12{1} = rows m12{2}  /\ rows m12{1} = N /\ 
+          cols m12{1} = cols m12{2} /\ cols m12{1} = N). 
+call (_ : true).
+call (inp_secure 1 2 0 3 p).
+auto; smt(_4p).
+
+seq 2 2: (={glob Adv, mx, my, b1, b2, b3, b4} /\ 0 <= p < N /\ 
+             view m23{1} p = view m23{2} p /\ 
+             rows m23{1} = rows m23{2}  /\ rows m23{1} = N /\ 
+             cols m23{1} = cols m23{2} /\ cols m23{1} = N /\ 
+             view m13{1} p = view m13{2} p /\ 
+             rows m13{1} = rows m13{2}  /\ rows m13{1} = N /\ 
+             cols m13{1} = cols m13{2} /\ cols m13{1} = N /\ 
+             view m12{1} p = view m12{2} p /\ 
+             rows m12{1} = rows m12{2}  /\ rows m12{1} = N /\ 
+             cols m12{1} = cols m12{2} /\ cols m12{1} = N /\ 
+             view m03{1} p = view m03{2} p /\ 
+             rows m03{1} = rows m03{2}  /\ rows m03{1} = N /\ 
+             cols m03{1} = cols m03{2} /\ cols m03{1} = N).
+call (_ : true).
+call (inp_secure 0 3 1 2 p).
+auto; smt(_4p).
+
+seq 2 2: (={glob Adv, mx, my, b1, b2, b3, b4, b5} /\ 0 <= p < N /\ 
+            view m23{1} p = view m23{2} p /\ 
+            rows m23{1} = rows m23{2} /\ rows m23{1} = N /\ 
+            cols m23{1} = cols m23{2} /\ cols m23{1} = N /\
+            view m13{1} p = view m13{2} p /\ 
+            rows m13{1} = rows m13{2} /\ rows m13{1} = N /\ 
+            cols m13{1} = cols m13{2} /\ cols m13{1} = N /\
+            view m12{1} p = view m12{2} p /\ 
+            rows m12{1} = rows m12{2} /\ rows m12{1} = N /\ 
+            cols m12{1} = cols m12{2} /\ cols m12{1} = N /\
+            view m03{1} p = view m03{2} p /\ 
+            rows m03{1} = rows m03{2} /\ rows m03{1} = N /\ 
+            cols m03{1} = cols m03{2} /\ cols m03{1} = N /\
+            view m02{1} p = view m02{2} p /\ 
+            rows m02{1} = rows m02{2} /\ rows m02{1} = N /\ 
+            cols m02{1} = cols m02{2} /\ cols m02{1} = N). 
+
+call (_ : true).
+call (inp_secure 0 2 1 3 p).
+auto; smt(_4p).
+
+seq 2 2: (={glob Adv, mx, my, b1, b2, b3, b4, b5, b6} /\ 0 <= p < N /\ 
+            view m23{1} p = view m23{2} p /\ 
+            rows m23{1} = rows m23{2} /\ rows m23{1} = N /\ 
+            cols m23{1} = cols m23{2} /\ cols m23{1} = N /\ 
+            view m13{1} p = view m13{2} p /\ 
+            rows m13{1} = rows m13{2} /\ rows m13{1} = N /\ 
+            cols m13{1} = cols m13{2} /\ cols m13{1} = N /\ 
+            view m12{1} p = view m12{2} p /\ 
+            rows m12{1} = rows m12{2} /\ rows m12{1} = N /\ 
+            cols m12{1} = cols m12{2} /\ cols m12{1} = N /\ 
+            view m03{1} p = view m03{2} p /\ 
+            rows m03{1} = rows m03{2} /\ rows m03{1} = N /\ 
+            cols m03{1} = cols m03{2} /\ cols m03{1} = N /\ 
+            view m02{1} p = view m02{2} p /\ 
+            rows m02{1} = rows m02{2} /\ rows m02{1} = N /\ 
+            cols m02{1} = cols m02{2} /\ cols m02{1} = N /\ 
+            view m01{1} p = view m01{2} p /\ 
+            rows m01{1} = rows m01{2} /\ rows m01{1} = N /\ 
+            cols m01{1} = cols m01{2} /\ cols m01{1} = N).  
+call (_ : true).
+call (inp_secure 0 1 2 3 p).
+auto; smt(_4p).
+
+seq 2 2: (={glob Adv, mx, my, b1, b2, b3, b4, b5, b6, b7} /\ 0 <= p < N /\ 
+            view m23{1} p = view m23{2} p /\ 
+            rows m23{1} = rows m23{2} /\  rows m23{1} = N /\ 
+            cols m23{1} = cols m23{2} /\ cols m23{1} = N /\ 
+            view m13{1} p = view m13{2} p /\ 
+            rows m13{1} = rows m13{2} /\  rows m13{1} = N /\ 
+            cols m13{1} = cols m13{2} /\ cols m13{1} = N /\ 
+            view m12{1} p = view m12{2} p /\ 
+            rows m12{1} = rows m12{2} /\  rows m12{1} = N /\ 
+            cols m12{1} = cols m12{2} /\ cols m12{1} = N /\ 
+            view m03{1} p = view m03{2} p /\ 
+            rows m03{1} = rows m03{2} /\  rows m03{1} = N /\ 
+            cols m03{1} = cols m03{2} /\ cols m03{1} = N /\ 
+            view m02{1} p = view m02{2} p /\ 
+            rows m02{1} = rows m02{2} /\  rows m02{1} = N /\ 
+            cols m02{1} = cols m02{2} /\ cols m02{1} = N /\ 
+            view m01{1} p = view m01{2} p /\ 
+            rows m01{1} = rows m01{2} /\  rows m01{1} = N /\ 
+            cols m01{1} = cols m01{2} /\ cols m01{1} = N /\ 
+            view mlocal{1} p = view mlocal{2} p /\ 
+            rows mlocal{1} = rows mlocal{2} /\ rows mlocal{2} = N /\ 
+            cols mlocal{1} = cols mlocal{2} /\ cols mlocal{1} = N).
+call (_ : true).
+wp.
+skip.
+rewrite _4p.
+move => &1 &2.
+simplify.
+elim =>[eq] [prange] [m23view] [m23rows] [m23rows4] [m23cols] [m23cols4] 
+                     [m13view] [m13rows] [m13rows4] [m13cols] [m13cols4] 
+                     [m12view] [m12rows] [m12rows4] [m12cols] [m12cols4]
+                     [m03view] [m03rows] [m03rows4] [m03cols] [m03cols4] 
+                     [m02view] [m02rows] [m02rows4] [m02cols] [m02cols4] 
+                     [m01view] [m01rows] [m01rows4] [m01cols] m01cols4. 
+
+rewrite !eq_vectorP !eq_matrixP.
+rewrite !eq.
+simplify.
+progress; smt().
+
+call (_: true).
+wp.
+skip.
+move => &1 &2.
+rewrite _4p.
+elim => [eq] [prange] [m23view] [m23rows] [m23rows4] [m23cols] [m23cols4] 
+                      [m13view] [m13rows] [m13rows4] [m13cols] [m13cols4] 
+                      [m12view] [m12rows] [m12rows4] [m12cols] [m12cols4] 
+                      [m03view] [m03rows] [m03rows4] [m03cols] [m03cols4] 
+                      [m02view] [m02rows] [m02rows4] [m02cols] [m02cols4] 
+                      [m01view] [m01rows] [m01rows4] [m01cols] [m01cols4] 
+                      [mlocalview] [mlocalrows] [mlocalrows4] [mlocalcols] mlocalcols4. 
+
+rewrite !view_linear.
+rewrite !cols_addm !rows_addm; smt().
+rewrite !cols_addm !rows_addm; smt().
+rewrite !cols_addm !rows_addm; smt().
+rewrite !cols_addm !rows_addm; smt().
+rewrite !cols_addm !rows_addm; smt().
+smt().
+rewrite !size_addm; smt().
+rewrite !size_addm; smt().
+rewrite !size_addm; smt().
+rewrite !size_addm; smt().
+rewrite !size_addm; smt().
+smt().
+smt().
+qed.
+
+
+lemma Sec_Mult_Inp &m :
+    0 <= p < N => 
+    Pr[GReal(Adv).mult_inp() @ &m : res] = 
+    Pr[GIdeal(Adv).mult_inp() @ &m: res].
+proof.
+rewrite _4p.
+progress.
+byequiv => //.
+conseq  GReal_GIdeal.
+progress; smt(_4p).
+qed.
+
+end section.
+
+
+(* The security theorem which states that the adversary is completely unable
+to distinguish between the two games.*)
+
+lemma Security_Mult_Inp (Adv <: ADV{}) &m :
+    0 <= p < N => 
+    Pr[GReal(Adv).mult_inp() @ &m : res] = 
+    Pr[GIdeal(Adv).mult_inp() @ &m: res].
+proof.
+rewrite _4p.
+progress.
+apply (Sec_Mult_Inp Adv &m); smt(_4p).
 qed.

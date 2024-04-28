@@ -1139,7 +1139,7 @@ qed.
 
 
 (************************)
-(* GAME 1 ***************)
+(* GAMES ****************)
 (************************)
 
 module type ADV = {
@@ -1157,6 +1157,11 @@ module type ADV = {
 
 module GReal (Adv : ADV) = {
 
+  (* This procedure directly calls the mult proc of F4 and the security is 
+     argued for the final matrix obtained after mult call i.e adversary can only
+     see the final views of the resulting matrix. The proof is cleaner
+     as it utilizes the call to the mult_secure lemma above*)
+
   proc mult_main(): bool = {
     
     var mx, my, mz : matrix;
@@ -1173,6 +1178,12 @@ module GReal (Adv : ADV) = {
     return b;  (* returns the result of the judgement *)
 
   }
+
+  (* This procedure implements the  mult proc of F4 again and the security is 
+     argued for each  matrix obtained after each inp call. The adversary can see the 
+     views of each matrix after each INP call and returns a boolean for each call.
+     This procedure returns the boolean which is the conjunction of all
+     the booleans obtained that adversary returns for each after each observation.*)
 
   proc mult_inp(): bool = {
     
@@ -1203,9 +1214,12 @@ module GReal (Adv : ADV) = {
     mresult <- m01 + m02 + m03 + m12 + m13 + m23 + mlocal; 
     b8 <@ Adv.put(view mresult p);
 
+    (* Conjunction of adversary's individual judgement for every matrix obtained  
+       after a call to inp in F4 is returned *)
+
     b9 <- b1 /\ b2 /\ b3 /\ b4 /\ b5 /\ b6 /\ b7 /\ b8; 
     
-    return b9;  (* returns the result of the judgement *)
+    return b9;
 
   }
 }.
@@ -1213,6 +1227,11 @@ module GReal (Adv : ADV) = {
 
 
 module GIdeal (Adv : ADV) = {
+
+  (* This procedure directly calls the mult proc of SIMULATOR and the security is 
+     argued for the final matrix obtained after mult call i.e adversary can only
+     see the final views of the resulting matrix. The proof is cleaner
+     as it utilizes the call to the mult_secure lemma above*)
 
   proc mult_main(): bool = {
     
@@ -1231,6 +1250,11 @@ module GIdeal (Adv : ADV) = {
 
   }
 
+  (* This procedure implements the  mult proc of SIMULATOR again and the security is 
+     argued for each  matrix obtained after each inp call. The adversary can see the 
+     views of each matrix after each INP call and returns a boolean for each call.
+     This procedure returns the boolean which is the conjunction of all
+     the booleans obtained that adversary returns for each after each observation.*)
 
   proc mult_inp(): bool = {
     
@@ -1261,13 +1285,20 @@ module GIdeal (Adv : ADV) = {
     mresult <- m01 + m02 + m03 + m12 + m13 + m23 + mlocal; 
     b8 <@ Adv.put(view mresult p);
 
+    (* Conjunction of adversary's individual judgement for every matrix obtained  
+       after a call to inp in SIMULATOR is returned *)
     b9 <- b1 /\ b2 /\ b3 /\ b4 /\ b5 /\ b6 /\ b7 /\ b8; 
     
-    return b9;  (* returns the result of the judgement *)
+    return b9; 
 
   }
 }.
 
+
+
+(************************)
+(* Proof for mult_main **)
+(************************)
 
 section.
 
@@ -1308,7 +1339,7 @@ end section.
 (* The security theorem which states that the adversary is completely unable
 to distinguish between the two games.*)
 
-lemma Security (Adv <: ADV{}) &m :
+lemma Security_Mult_Main (Adv <: ADV{}) &m :
     0 <= p < N => 
     Pr[GReal(Adv).mult_main() @ &m : res] = 
     Pr[GIdeal(Adv).mult_main() @ &m: res].
@@ -1319,9 +1350,11 @@ apply (Sec_Mult_Main Adv &m); smt(_4p).
 qed.
 
 
+(************************)
+(** Proof for mult_inp **)
+(************************)
 
 section.
-
 
 (*There are no global states maintained in any of the modules*)
 declare module Adv <: ADV{}.
@@ -1342,6 +1375,7 @@ seq 2 2: (={glob Adv, mx, my, b1} /\ 0 <= p < N /\
            rows m23{1} = rows m23{2} /\ rows m23{1} = N  /\ 
            cols m23{1} = cols m23{2} /\ cols m23{1} = N). 
 call (_ : true).
+
 call (inp_secure 2 3 0 1 p).
 auto; smt(_4p).
 
@@ -1467,7 +1501,7 @@ elim =>[eq] [prange] [m23view] [m23rows] [m23rows4] [m23cols] [m23cols4]
                      [m01view] [m01rows] [m01rows4] [m01cols] m01cols4. 
 
 rewrite !eq_vectorP !eq_matrixP.
-rewrite !eq.
+rewrite !eq. (* This rewrite takes some time. Be Patient. *)
 simplify.
 progress; smt().
 

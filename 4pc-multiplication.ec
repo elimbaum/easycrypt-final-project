@@ -76,7 +76,7 @@ qed.
 (* WARNING: matrices are zero indexed, so we need to have share 0, party 0 *)
 (* matrix semantics are [party, share] *)
 
-(* An unspecified non-zero error value *)
+(* An unspecified non-zero error value to use as a list default *)
 op err : elem.
 axiom _enz : err <> zero.
 
@@ -84,7 +84,6 @@ axiom _enz : err <> zero.
 op sumz_elem (sz : elem list) = foldr Zmod.(+) zero sz.
 
 op open(m : matrix) =
-    (* consistency check? or precondition? *)
     (* add up party 0 shares, then add P1's x0... make this nicer? *)
     m.[0, 1] + m.[0, 2] + m.[0, 3] + m.[1, 0].
 
@@ -119,7 +118,6 @@ module F4 = {
   (* dealer has value x and wants to share it with all other parties *)
   proc share(x : elem) : matrix = {
     var s0, s1, s2: elem;
-
     var shares : elem list;
 
     (* generate random *)
@@ -156,13 +154,12 @@ module F4 = {
   }
 
   (* parties i and j know x, and want to share it with the two other
-     parties g and h.*)
-
+     parties g and h. *)
   proc inp(x : elem, i j g h : party) : matrix = {
     var r, xh : elem;
     var pgm, minp : matrix;
 
-    (* in the paper this is a PRF, but for now, model as truly random
+    (* in the paper this is a keyed PRF, but for now, model as truly random
        and just don't give it to party g.
        parties i, j, h generate r which is share of g. *)
     r <$ randelem;
@@ -170,10 +167,23 @@ module F4 = {
     (* only parties i and j know BOTH x and r, so only parties i and j know xh *)
     xh <- x - r;
 
-    (* Use jmp to send xh from Pi, Pj to Pg *)
+    (* Use jmp to send xh from Pi, Pj to Pg. This creates the matrix
+      |. 0 0 xh|
+      |0 . 0 xh|
+      |0 0 . xh|
+      |0 0 0  .|
+      [i j g  h]
+    *)
     pgm <@ jmp(xh, i, j, g, h);
 
-    (* xi = xj = 0, xg = r, xh = x - r (within pgm) *)
+    (* xi = xj = 0, xg = r, xh = x - r (within pgm)
+      Resulting matrix is
+      |. 0 r xh|
+      |0 . r xh|
+      |0 0 . xh|
+      |0 0 r  .|
+      [i j g  h]
+      *)
     minp <- pgm + offunm ((fun p s => 
       if s = p then zero else
       if s = g then r else zero), N, N);
@@ -181,7 +191,6 @@ module F4 = {
   }
 
   (* The multiplication protocol.*)
-
   proc mult(mx my : matrix) : matrix = {
     var m23, m13, m12, m03, m02, m01, mlocal : matrix;
 
@@ -190,7 +199,11 @@ module F4 = {
       can together compute the term x0y1 * x1y0.
       
       For symmetry we alternate which party we take the share from, but
-      the validity check ensures this doesn't actually change the output. *)
+      the validity check ensures this doesn't actually change the output.
+
+      first two parties are the SENDING parties. (e.g. 2, 3)
+      second two parties are the RECEIVING parties. (e.g. 0, 1)
+      *)
     m23 <@ inp(mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1], 2, 3, 0, 1);
     m13 <@ inp(mx.[0, 2] * my.[1, 0] + mx.[1, 0] * my.[0, 2], 1, 3, 0, 2);
     m12 <@ inp(mx.[0, 3] * my.[1, 0] + mx.[1, 0] * my.[0, 3], 1, 2, 0, 3);
@@ -207,8 +220,7 @@ module F4 = {
     return m01 + m02 + m03 + m12 + m13 + m23 + mlocal;   
   }
 
-  (* add operation on the shares *)
-
+  (* shared-and-add execution *)
   proc add_main(x y : elem) : matrix = {
     var mx, my, mz : matrix;
 
@@ -271,13 +283,7 @@ module Sim = {
  proc mult(mx my : matrix) : matrix = {
     var m23, m13, m12, m03, m02, m01, mlocal : matrix;
 
-    (* perform inp on pairs of shares held by both parties.
-      for example, both parties 2 and 3 hold x0, x1, y0, y1, so they
-      can together compute the term x0y1 * x1y0.
-      
-      For symmetry we alternate which party we take the share from, but
-      the validity check ensures this doesn't actually change the output.
-     *)
+    (* simulator multiply is the same, except now we call simulator INP *)
     m23 <@ inp(mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1], 2, 3, 0, 1);
     m13 <@ inp(mx.[0, 2] * my.[1, 0] + mx.[1, 0] * my.[0, 2], 1, 3, 0, 2);
     m12 <@ inp(mx.[0, 3] * my.[1, 0] + mx.[1, 0] * my.[0, 3], 1, 2, 0, 3);
@@ -285,12 +291,10 @@ module Sim = {
     m02 <@ inp(mx.[0, 3] * my.[0, 1] + mx.[0, 1] * my.[0, 3], 0, 2, 1, 3);
     m01 <@ inp(mx.[0, 3] * my.[0, 2] + mx.[0, 2] * my.[0, 3], 0, 1, 2, 3);
 
-    (* elementwise multiplication to create sharing of x_i * y_i
-       this implements inp_local: no communication occurs *)
+    (* local computation still occurs *)
     mlocal <- offunm ((fun p s => 
       if s = p then zero else mx.[p, s] * my.[p, s]), N, N);
 
-    (* elementwise addition *)
     return m01 + m02 + m03 + m12 + m13 + m23 + mlocal;   
   }
 
@@ -376,7 +380,7 @@ proc.
 wp.
 (*** party 3 ***) 
 case (p = 3).
-(* easy: all random in both cases *)
+(* easy: all random in both cases; use identity isomorphism *)
 seq 3 3 : (={s0, s1, s2} /\ p = 3); auto. 
 rewrite _4p.
 progress.
@@ -387,9 +391,6 @@ rewrite !get_offunv //=.
 rewrite !get_offunm; first rewrite rows_offunm cols_offunm //.
 rewrite shgt0 shlt4 //=.
 simplify.
-case (sh = 0) => [// | shn0].
-case (sh = 1) => [// | shn1].
-case (sh = 2) => //.
 smt().
 
 (* other parties. last share is technically non-random but still looks it. *)
@@ -397,6 +398,7 @@ smt().
 case (p = 2).
 seq 2 2 : (={x, s0, s1} /\ p = 2).
 auto.
+(* ignore s2 on the right: party 2 can't see it *)
 seq 0 1 : (={x, s0, s1} /\ p = 2).
 auto.
 rnd (fun u => x{1} - (s0{1} + s1{1} + u)).
@@ -410,17 +412,15 @@ move => sh [shgt0 shlt4].
 rewrite !get_offunv //=.
 rewrite !get_offunm; first 2 rewrite rows_offunm cols_offunm /#.
 simplify.
-case (sh = 0) => [// | shn0].
-case (sh = 1) => [// | shn1].
-case (sh = 2) => [-> //= | shn2].
-have -> //= : sh = 3 by smt().
+smt().
 
 (*** party 1 ***)
 case (p = 1).
 seq 1 1 : (={x, s0} /\ p = 1).
 auto.
-(* THIS IS THE TICKET! *)
+(* THIS IS THE TICKET! need swap to get rand calls in the right order. *)
 swap{1} 1.
+(* get rid of s1 on the right. *)
 seq 0 1 : (={x, s0} /\ p = 1).
 auto.
 seq 1 1 : (={x, s0, s2} /\ p = 1).
@@ -436,11 +436,8 @@ move => sh [shgt0 shlt4].
 rewrite !get_offunv //=.
 rewrite !get_offunm; first 2 rewrite rows_offunm cols_offunm //.
 simplify.
-case (sh = 0) => [// | shn0].
-case (sh = 1) => [// | shn1].
-case (sh = 2) => [// | shn2].
-have -> //= : sh = 3 by smt().
-algebra.
+case (sh = 3) => [-> //= | ?]; first by algebra.
+smt().
 
 (*** party 0 ***)
 swap 1 2.
@@ -458,11 +455,8 @@ move => sh [shgt0 shlt4].
 
 rewrite !get_offunv //=.
 rewrite !get_offunm; first 2 rewrite rows_offunm cols_offunm //.
-case (sh = 0) => [// | shn0].
-case (sh = 1) => [// | shn1].
-case (sh = 2) => [// | shn2].
-have -> //= : sh = 3 by smt().
-algebra.
+case (sh = 3) => [-> //= | ?]; first by algebra.
+smt().
 qed.
 
 (************************)
@@ -579,8 +573,8 @@ move: H0 H2.
 rewrite rows_addm rowsn rows_offunm
         cols_addm colsn cols_offunm. 
 smt().
-have s_noteq_p: s <> p by smt().
-by rewrite H4 s_noteq_p.
+rewrite eq_sym in H3.
+by rewrite H4 H3.
 
 (* begin correctness proof *)
 rewrite open_linear /open.
@@ -592,10 +586,9 @@ case (1 = g_) => [<- //= | ?]; smt(addrC addrA addNr add0r).
 qed.
 
 (* prove inp security:
- * for the two receiving parties (g & h), the protocol and simulator
- * are indistinguishable. we cannot include parties i and j in this
- * security proof, since they already know the value of x. therefore,
- * no simulator could generate a share matrix which would fool them.
+ * for the two receiving parties (g & h), they receive random output
+ * from simulator. Pi and Pj receive the same output, since they know
+ * what to expect and cannot be fooled by the simulator.
  *)
 lemma inp_secure(i_ j_ g_ h_ : party, p : party) :
     equiv[F4.inp ~ Sim.inp :
@@ -631,9 +624,7 @@ rewrite !get_offunm; first 2 rewrite rows_offunm cols_offunm //=.
 simplify.
 move : H0 H1.
 rewrite !negb_or.
-elim => inj.
-elim => ing inh.
-elim => jng jnh.
+elim => inj [ing inh [jng jnh]].
 case (share = p) => [//= | off_diag].
 by rewrite add0r.
 have -> //= : p <> g{2} by smt().
@@ -643,12 +634,10 @@ case (share = j{2}) => [-> //= | share_not_j].
 by rewrite jnh jng //= add0r.
 case (share = g{2}) => [-> //= | share_not_g].
 by rewrite H2 //= add0r.
-have all_uniq : uniq [i{2}; j{2}; g{2}; h{2}].
-smt().
-case (share = h{2}) => [//= | share_not_h]; by rewrite addrC add0r.
+smt(addrC add0r).
 
 (* end of first case: Pi Pj identical.
- * next, viewing party is ph: share (0, 0, r) *)
+ * next, viewing party is Ph: share (0, 0, r) *)
 case (p = h{2}).
 (* r are the same *)
 seq 1 1 : (={x,h,i,j,g,r} /\ p = h_ /\ h{1} = h_ /\ h_ <> g_ /\ g_ = g{2} /\ 0 <= g_ < N /\ 0 <= p < N).
@@ -722,7 +711,6 @@ qed.
 (* ADD ******************)
 (************************)
 
-
 (* Prove addition is correct *)
 lemma add_correct(x_ y_ : elem) :
     hoare[F4.add_main : x = x_ /\ y = y_
@@ -736,14 +724,11 @@ auto => />; progress; smt().
 seq 1 : (open mx = x_ /\ size mx = (N, N) /\ valid mx /\
          open my = y_ /\ size my = (N, N) /\ valid my).
 call (share_correct y_).
-
-(*Validity proof*)
 auto.
 rewrite _4p.
 progress; smt().
-wp.
-auto => />.
 (*Validity proof*)
+auto => />.
 rewrite _4p.
 move => &hr rows_mx cols_mx _ _ diag_mx not_diag_mx_left not_diag_mx_right rows_my cols_my _ _ diag_my not_diag_my_left not_diag_my_right.
 progress.
@@ -928,7 +913,7 @@ clear H14 H16.
 rewrite valid_diag0 // valid_diag0 // valid_diag0 //
         valid_diag0 // valid_diag0 // valid_diag0 //.
 rewrite get_offunm /= //.
-smt(zeroE).
+algebra.
 
 (* 3a. prove columns consistent *)
 have plt4 : p < 4.
@@ -960,8 +945,8 @@ rewrite get_offunm.
 rewrite cols_offunm rows_offunm lez_maxr //.
 trivial.
 simplify.
-have zneqp : 0 <> p by smt().
-rewrite zneqp /=.
+rewrite eq_sym in H17.
+rewrite H17 //=.
 
 rewrite (valid_col0 result) //.
 rewrite _4p /#.
@@ -1006,9 +991,7 @@ rewrite rows_offunm cols_offunm.
 rewrite valid_size // valid_size // valid_size //
         valid_size // valid_size // valid_size //.
 rewrite _4p.
-rewrite /max.
-simplify.
-smt().
+rewrite !lez_maxr //.
 
 simplify.
 rewrite 11!get_addm.
@@ -1020,11 +1003,9 @@ rewrite get_offunm.
 rewrite cols_offunm rows_offunm.
 trivial.
 simplify.
-simplify.
 rewrite H18.
 rewrite eq_sym in H17.
-rewrite H17.
-simplify.
+rewrite H17 //=.
 rewrite (valid_colp result) //.
 rewrite valid_size // valid_size // _4p /#.
 rewrite (valid_colp result0) //.
@@ -1042,7 +1023,6 @@ rewrite valid_size // valid_size // _4p /#.
 rewrite (valid_colp my{hr}) //.
 rewrite valid_size // valid_size // _4p /#.
 qed.
-
 
 lemma mult_secure(p: party) :
     equiv[F4.mult ~ Sim.mult :
@@ -1296,7 +1276,7 @@ rewrite _4p.
 progress.
 byequiv => //.
 conseq  GReal_GIdeal.
-progress; smt(_4p).
+progress; by rewrite _4p.
 qed.
 
 end section.
@@ -1312,7 +1292,7 @@ lemma Security_Mult_Main (Adv <: ADV{}) &m :
 proof.
 rewrite _4p.
 progress.
-apply (Sec_Mult_Main Adv &m); smt(_4p).
+apply (Sec_Mult_Main Adv &m); by rewrite _4p.
 qed.
 
 
@@ -1340,8 +1320,7 @@ auto.
 (* 1st call to INP*)
 seq 2 2: (={glob Adv, mx, my, b1} /\ 0 <= p < N /\ 
            view m23{1} p = view m23{2} p /\ 
-           rows m23{1} = rows m23{2} /\ rows m23{1} = N  /\ 
-           cols m23{1} = cols m23{2} /\ cols m23{1} = N). 
+           size m23{1} = size m23{2} /\ size m23{1} = (N, N)).
 call (_ : true).
 call (inp_secure 2 3 0 1 p).
 auto; smt(_4p).
@@ -1349,11 +1328,9 @@ auto; smt(_4p).
 (* 2nd call to INP*)
 seq 2 2: (={glob Adv, mx, my, b1, b2} /\ 0 <= p < N /\ 
             view m23{1} p = view m23{2} p /\ 
-            rows m23{1} = rows m23{2}  /\ rows m23{1} = N /\ 
-            cols m23{1} = cols m23{2} /\ cols m23{1} = N /\
+            size m23{1} = size m23{2}  /\ size m23{1} = (N, N) /\ 
             view m13{1} p = view m13{2} p /\ 
-            rows m13{1} = rows m13{2}  /\ rows m13{1} = N /\ 
-            cols m13{1} = cols m13{2} /\ cols m13{1} = N). 
+            size m13{1} = size m13{2}  /\ size m13{1} = (N, N)). 
 call (_ : true).
 call (inp_secure 1 3 0 2 p).
 auto; smt(_4p).
@@ -1361,135 +1338,104 @@ auto; smt(_4p).
 (* 3rd call to INP*)
 seq 2 2: (={glob Adv, mx, my, b1, b2, b3} /\ 0 <= p < N /\
           view m23{1} p = view m23{2} p /\ 
-          rows m23{1} = rows m23{2}  /\ rows m23{1} = N /\ 
-          cols m23{1} = cols m23{2} /\ cols m23{1} = N /\
+          size m23{1} = size m23{2}  /\ size m23{1} = (N, N) /\ 
           view m13{1} p = view m13{2} p /\ 
-          rows m13{1} = rows m13{2}  /\ rows m13{1} = N /\ 
-          cols m13{1} = cols m13{2} /\ cols m13{1} = N /\
+          size m13{1} = size m13{2}  /\ size m13{1} = (N, N) /\ 
           view m12{1} p = view m12{2} p /\ 
-          rows m12{1} = rows m12{2}  /\ rows m12{1} = N /\ 
-          cols m12{1} = cols m12{2} /\ cols m12{1} = N). 
+          size m12{1} = size m12{2}  /\ size m12{1} = (N, N)).
 call (_ : true).
 call (inp_secure 1 2 0 3 p).
 auto; smt(_4p).
 
 (* 4th call to INP*)
-seq 2 2: (={glob Adv, mx, my, b1, b2, b3, b4} /\ 0 <= p < N /\ 
-             view m23{1} p = view m23{2} p /\ 
-             rows m23{1} = rows m23{2}  /\ rows m23{1} = N /\ 
-             cols m23{1} = cols m23{2} /\ cols m23{1} = N /\ 
-             view m13{1} p = view m13{2} p /\ 
-             rows m13{1} = rows m13{2}  /\ rows m13{1} = N /\ 
-             cols m13{1} = cols m13{2} /\ cols m13{1} = N /\ 
-             view m12{1} p = view m12{2} p /\ 
-             rows m12{1} = rows m12{2}  /\ rows m12{1} = N /\ 
-             cols m12{1} = cols m12{2} /\ cols m12{1} = N /\ 
-             view m03{1} p = view m03{2} p /\ 
-             rows m03{1} = rows m03{2}  /\ rows m03{1} = N /\ 
-             cols m03{1} = cols m03{2} /\ cols m03{1} = N).
+seq 2 2: (={glob Adv, mx, my, b1, b2, b3, b4} /\ 0 <= p < N /\
+          view m23{1} p = view m23{2} p /\ 
+          size m23{1} = size m23{2}  /\ size m23{1} = (N, N) /\ 
+          view m13{1} p = view m13{2} p /\ 
+          size m13{1} = size m13{2}  /\ size m13{1} = (N, N) /\ 
+          view m12{1} p = view m12{2} p /\ 
+          size m12{1} = size m12{2}  /\ size m12{1} = (N, N) /\
+          view m03{1} p = view m03{2} p /\
+          size m03{1} = size m03{2} /\ size m03{1} = (N, N)).
 call (_ : true).
 call (inp_secure 0 3 1 2 p).
 auto; smt(_4p).
 
 (* 5th call to INP*)
 seq 2 2: (={glob Adv, mx, my, b1, b2, b3, b4, b5} /\ 0 <= p < N /\ 
-            view m23{1} p = view m23{2} p /\ 
-            rows m23{1} = rows m23{2} /\ rows m23{1} = N /\ 
-            cols m23{1} = cols m23{2} /\ cols m23{1} = N /\
-            view m13{1} p = view m13{2} p /\ 
-            rows m13{1} = rows m13{2} /\ rows m13{1} = N /\ 
-            cols m13{1} = cols m13{2} /\ cols m13{1} = N /\
-            view m12{1} p = view m12{2} p /\ 
-            rows m12{1} = rows m12{2} /\ rows m12{1} = N /\ 
-            cols m12{1} = cols m12{2} /\ cols m12{1} = N /\
-            view m03{1} p = view m03{2} p /\ 
-            rows m03{1} = rows m03{2} /\ rows m03{1} = N /\ 
-            cols m03{1} = cols m03{2} /\ cols m03{1} = N /\
-            view m02{1} p = view m02{2} p /\ 
-            rows m02{1} = rows m02{2} /\ rows m02{1} = N /\ 
-            cols m02{1} = cols m02{2} /\ cols m02{1} = N). 
-
+          view m23{1} p = view m23{2} p /\ 
+          size m23{1} = size m23{2}  /\ size m23{1} = (N, N) /\ 
+          view m13{1} p = view m13{2} p /\ 
+          size m13{1} = size m13{2}  /\ size m13{1} = (N, N) /\ 
+          view m12{1} p = view m12{2} p /\ 
+          size m12{1} = size m12{2}  /\ size m12{1} = (N, N) /\
+          view m03{1} p = view m03{2} p /\
+          size m03{1} = size m03{2} /\ size m03{1} = (N, N) /\
+          view m02{1} p = view m02{2} p /\
+          size m02{1} = size m02{2} /\ size m02{1} = (N, N)).
 call (_ : true).
 call (inp_secure 0 2 1 3 p).
 auto; smt(_4p).
 
 (* 6th call to INP*)
-seq 2 2: (={glob Adv, mx, my, b1, b2, b3, b4, b5, b6} /\ 0 <= p < N /\ 
-            view m23{1} p = view m23{2} p /\ 
-            rows m23{1} = rows m23{2} /\ rows m23{1} = N /\ 
-            cols m23{1} = cols m23{2} /\ cols m23{1} = N /\ 
-            view m13{1} p = view m13{2} p /\ 
-            rows m13{1} = rows m13{2} /\ rows m13{1} = N /\ 
-            cols m13{1} = cols m13{2} /\ cols m13{1} = N /\ 
-            view m12{1} p = view m12{2} p /\ 
-            rows m12{1} = rows m12{2} /\ rows m12{1} = N /\ 
-            cols m12{1} = cols m12{2} /\ cols m12{1} = N /\ 
-            view m03{1} p = view m03{2} p /\ 
-            rows m03{1} = rows m03{2} /\ rows m03{1} = N /\ 
-            cols m03{1} = cols m03{2} /\ cols m03{1} = N /\ 
-            view m02{1} p = view m02{2} p /\ 
-            rows m02{1} = rows m02{2} /\ rows m02{1} = N /\ 
-            cols m02{1} = cols m02{2} /\ cols m02{1} = N /\ 
-            view m01{1} p = view m01{2} p /\ 
-            rows m01{1} = rows m01{2} /\ rows m01{1} = N /\ 
-            cols m01{1} = cols m01{2} /\ cols m01{1} = N).  
+seq 2 2: (={glob Adv, mx, my, b1, b2, b3, b4, b5, b6} /\ 0 <= p < N /\
+          view m23{1} p = view m23{2} p /\ 
+          size m23{1} = size m23{2}  /\ size m23{1} = (N, N) /\ 
+          view m13{1} p = view m13{2} p /\ 
+          size m13{1} = size m13{2}  /\ size m13{1} = (N, N) /\ 
+          view m12{1} p = view m12{2} p /\ 
+          size m12{1} = size m12{2}  /\ size m12{1} = (N, N) /\
+          view m03{1} p = view m03{2} p /\
+          size m03{1} = size m03{2} /\ size m03{1} = (N, N) /\
+          view m02{1} p = view m02{2} p /\
+          size m02{1} = size m02{2} /\ size m02{1} = (N, N) /\
+          view m01{1} p = view m01{2} p /\ 
+          size m01{1} = size m01{2} /\ size m01{1} = (N, N)).
 call (_ : true).
 call (inp_secure 0 1 2 3 p).
 auto; smt(_4p).
 
 (*Handling INPLocal*)
 seq 2 2: (={glob Adv, mx, my, b1, b2, b3, b4, b5, b6, b7} /\ 0 <= p < N /\ 
-            view m23{1} p = view m23{2} p /\ 
-            rows m23{1} = rows m23{2} /\  rows m23{1} = N /\ 
-            cols m23{1} = cols m23{2} /\ cols m23{1} = N /\ 
-            view m13{1} p = view m13{2} p /\ 
-            rows m13{1} = rows m13{2} /\  rows m13{1} = N /\ 
-            cols m13{1} = cols m13{2} /\ cols m13{1} = N /\ 
-            view m12{1} p = view m12{2} p /\ 
-            rows m12{1} = rows m12{2} /\  rows m12{1} = N /\ 
-            cols m12{1} = cols m12{2} /\ cols m12{1} = N /\ 
-            view m03{1} p = view m03{2} p /\ 
-            rows m03{1} = rows m03{2} /\  rows m03{1} = N /\ 
-            cols m03{1} = cols m03{2} /\ cols m03{1} = N /\ 
-            view m02{1} p = view m02{2} p /\ 
-            rows m02{1} = rows m02{2} /\  rows m02{1} = N /\ 
-            cols m02{1} = cols m02{2} /\ cols m02{1} = N /\ 
-            view m01{1} p = view m01{2} p /\ 
-            rows m01{1} = rows m01{2} /\  rows m01{1} = N /\ 
-            cols m01{1} = cols m01{2} /\ cols m01{1} = N /\ 
-            view mlocal{1} p = view mlocal{2} p /\ 
-            rows mlocal{1} = rows mlocal{2} /\ rows mlocal{2} = N /\ 
-            cols mlocal{1} = cols mlocal{2} /\ cols mlocal{1} = N).
+          view m23{1} p = view m23{2} p /\ 
+          size m23{1} = size m23{2}  /\ size m23{1} = (N, N) /\ 
+          view m13{1} p = view m13{2} p /\ 
+          size m13{1} = size m13{2}  /\ size m13{1} = (N, N) /\ 
+          view m12{1} p = view m12{2} p /\ 
+          size m12{1} = size m12{2}  /\ size m12{1} = (N, N) /\
+          view m03{1} p = view m03{2} p /\
+          size m03{1} = size m03{2} /\ size m03{1} = (N, N) /\
+          view m02{1} p = view m02{2} p /\
+          size m02{1} = size m02{2} /\ size m02{1} = (N, N) /\
+          view m01{1} p = view m01{2} p /\ 
+          size m01{1} = size m01{2} /\ size m01{1} = (N, N) /\
+          view mlocal{1} p = view mlocal{2} p /\ 
+          size mlocal{1} = size mlocal{2} /\ size mlocal{2} = (N, N)).
 call (_ : true).
 wp.
 skip.
 rewrite _4p.
 move => &1 &2.
 simplify.
-elim =>[eq] [prange] [m23view] [m23rows] [m23rows4] [m23cols] [m23cols4] 
-                     [m13view] [m13rows] [m13rows4] [m13cols] [m13cols4] 
-                     [m12view] [m12rows] [m12rows4] [m12cols] [m12cols4]
-                     [m03view] [m03rows] [m03rows4] [m03cols] [m03cols4] 
-                     [m02view] [m02rows] [m02rows4] [m02cols] [m02cols4] 
-                     [m01view] [m01rows] [m01rows4] [m01cols] m01cols4. 
+elim =>[eq] [prange] [m23view] [m23size] [m23size4]
+                     [m13view] [m13size] [m13size4]
+                     [m12view] [m12size] [m12size4]
+                     [m03view] [m03size] [m03size4]
+                     [m02view] [m02size] [m02size4]
+                     [m01view] [m01size] [m01size4].
 
 rewrite !eq_vectorP !eq_matrixP.
-rewrite !eq. (* This rewrite takes some time. Be Patient. *)
 simplify.
-progress; smt().
+(* this can take a while. *)
+progress; try rewrite !eq; trivial; smt().
 
 call (_: true).
 wp.
 skip.
 move => &1 &2.
 rewrite _4p.
-elim => [eq] [prange] [m23view] [m23rows] [m23rows4] [m23cols] [m23cols4] 
-                      [m13view] [m13rows] [m13rows4] [m13cols] [m13cols4] 
-                      [m12view] [m12rows] [m12rows4] [m12cols] [m12cols4] 
-                      [m03view] [m03rows] [m03rows4] [m03cols] [m03cols4] 
-                      [m02view] [m02rows] [m02rows4] [m02cols] [m02cols4] 
-                      [m01view] [m01rows] [m01rows4] [m01cols] [m01cols4] 
-                      [mlocalview] [mlocalrows] [mlocalrows4] [mlocalcols] mlocalcols4. 
+
+elim => ??.
 
 rewrite !view_linear.
 rewrite !cols_addm !rows_addm; smt().

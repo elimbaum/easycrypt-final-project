@@ -109,38 +109,120 @@ op valid(m : matrix) =
           (* for all other shares, equal to party 0's *)
            m.[p, s] = m.[0, s]).
 
-(* oops. this might be backwards from what we need. *)
-lemma valid_linear (x y : matrix) :
-    valid x /\ valid y => valid (x + y).
-proof.
-rewrite /valid _4p.
-progress.
-rewrite rows_addm /#.
-rewrite cols_addm /#.
-have alt4 : a < 4.
-move : H10.
-rewrite rows_addm /#.
-rewrite get_addm.
-rewrite H1; first by smt().
-rewrite H6; first by smt().
-by rewrite add0r.
-have plt4 : p < 4.
-rewrite rows_addm in H10; smt().
-rewrite !get_addm.
-rewrite H2; first by smt().
-rewrite H7; first by smt().
-trivial.
-have pslt4 : p < 4 /\ s < 4.
-move : H10 H12. rewrite rows_addm cols_addm; smt().
-rewrite !get_addm.
-rewrite H3; first by smt().
-rewrite H8; first by smt().
-trivial.
-qed.
-
+(* view represents the shares visible to a party p. *)
 op view(m : matrix, p : party) =
   row m p.
 
+(* Real Implementation of the Fantastic4 Protocol *)
+
+module F4 = {
+  (* dealer has value x and wants to share it with all other parties *)
+  proc share(x : elem) : matrix = {
+    var s0, s1, s2: elem;
+
+    var shares : elem list;
+
+    (* generate random *)
+    s0 <$ randelem;
+    s1 <$ randelem;
+    s2 <$ randelem;
+
+    (* set last share such that the new sum equals x *)
+    shares <- [s0; s1; s2; x - (s0 + s1 + s2)];
+
+    return offunm ((fun p_ s =>
+        if p_ = s then zero else (nth err shares s)), N, N);
+  }
+
+  (* parties si and sj know x, and want to send it to party d.
+     g is exlcuded.
+     NOTE: this is NOT a secure functionality. just message passing.
+
+     matrix representation:
+      |. 0 0 x|     |. 0 0 x|    party i
+      |0 . 0 x| --> |0 . 0 x|    party h
+      |0 0 . ?|     |0 0 . x|    party g
+      |0 0 0 .|     |0 0 0 .|   (party h)
+   *)
+
+  proc jmp(x : elem, si sj g h : party) : matrix = {
+    var mjmp : matrix;
+
+    (* zero matrix, except share h, which is x *)
+    mjmp <- offunm ((fun p s =>
+        if s = p then zero else
+        if s = h then x else zero), N, N);
+    return mjmp;
+  }
+
+  (* parties i and j know x, and want to share it with the two other
+     parties g and h.*)
+
+  proc inp(x : elem, i j g h : party) : matrix = {
+    var r, xh : elem;
+    var pgm, minp : matrix;
+
+    (* in the paper this is a PRF, but for now, model as truly random
+       and just don't give it to party g.
+       parties i, j, h generate r which is share of g. *)
+    r <$ randelem;
+
+    (* only parties i and j know BOTH x and r, so only parties i and j know xh *)
+    xh <- x - r;
+
+    (* Use jmp to send xh from Pi, Pj to Pg *)
+    pgm <@ jmp(xh, i, j, g, h);
+
+    (* xi = xj = 0, xg = r, xh = x - r (within pgm) *)
+    minp <- pgm + offunm ((fun p s => 
+      if s = p then zero else
+      if s = g then r else zero), N, N);
+    return minp;
+  }
+
+  (* The multiplication protocol.*)
+
+  proc mult(mx my : matrix) : matrix = {
+    var m23, m13, m12, m03, m02, m01, mlocal : matrix;
+
+    (* perform inp on pairs of shares held by both parties.
+      for example, both parties 2 and 3 hold x0, x1, y0, y1, so they
+      can together compute the term x0y1 * x1y0.
+      
+      For symmetry we alternate which party we take the share from, but
+      the validity check ensures this doesn't actually change the output. *)
+    m23 <@ inp(mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1], 2, 3, 0, 1);
+    m13 <@ inp(mx.[0, 2] * my.[1, 0] + mx.[1, 0] * my.[0, 2], 1, 3, 0, 2);
+    m12 <@ inp(mx.[0, 3] * my.[1, 0] + mx.[1, 0] * my.[0, 3], 1, 2, 0, 3);
+    m03 <@ inp(mx.[0, 2] * my.[0, 1] + mx.[0, 1] * my.[0, 2], 0, 3, 1, 2);
+    m02 <@ inp(mx.[0, 3] * my.[0, 1] + mx.[0, 1] * my.[0, 3], 0, 2, 1, 3);
+    m01 <@ inp(mx.[0, 3] * my.[0, 2] + mx.[0, 2] * my.[0, 3], 0, 1, 2, 3);
+
+    (* elementwise multiplication to create sharing of x_i * y_i
+       this implements inp_local: no communication occurs *)
+    mlocal <- offunm ((fun p s => 
+      if s = p then zero else mx.[p, s] * my.[p, s]), N, N);
+
+    (* elementwise addition *)
+    return m01 + m02 + m03 + m12 + m13 + m23 + mlocal;   
+  }
+
+  (* add operation on the shares *)
+
+  proc add_main(x y : elem) : matrix = {
+    var mx, my, mz : matrix;
+
+    mx <@ share(x);
+    my <@ share(y);
+
+    (* addition is local *)
+    mz <- mx + my;
+
+    return mz;
+  }
+}.
+
+(* Simulated Implementation of the Fantastic4 Protocol *)
 
 module Sim = {
   (* simulator ignores x and just returns a random sharing
@@ -169,7 +251,7 @@ module Sim = {
 
     r <$ randelem;
     
-    (* for Pi Pj : sim can't fool them, since them already have 
+    (* for Pi Pj : sim can't fool them, since them already have x.
        Security for INP is only against g and h
      *)
     xh <- x - r;
@@ -221,121 +303,6 @@ module Sim = {
     return mx + my;
   }
 }.
-
-
-module F4 = {
-  
-  (* dealer has value x and wants to share it with all other parties *)
-  proc share(x : elem) : matrix = {
-    var s0, s1, s2: elem;
-
-    var shares : elem list;
-
-    (* generate random *)
-    s0 <$ randelem;
-    s1 <$ randelem;
-    s2 <$ randelem;
-
-    (* set last share such that the new sum equals x *)
-    shares <- [s0; s1; s2; x - (s0 + s1 + s2)];
-
-    (* TODO: basically every `offunm` call is going to have the structure
-        if p_ = s then 0 else ...
-       maybe we can factor that out?
-     *)
-    return offunm ((fun p_ s =>
-        if p_ = s then zero else (nth err shares s)), N, N);
-  }
-
-  (* parties si and sj know x, and want to send it to party d.
-     g is exlcuded.
-     todo: cheating identification (vs just abort)
-     NOTE: this is NOT a secure functionality. just message passing.
-
-
-     matrix representation:
-      |. 0 0 x|     |. 0 0 x|    party i
-      |0 . 0 x| --> |0 . 0 x|    party h
-      |0 0 . ?|     |0 0 . x|    party g
-      |0 0 0 .|     |0 0 0 .|  ( party h)
-   *)
-  proc jmp(x : elem, si sj g h : party) : matrix = {
-    (* TODO: party g gets x from si, and H(x) from sj *)
-    (* abort if hashes don't check out *)
-    (* mayank points out: don't do hash. just both send, compare *)
-    var mjmp : matrix;
-
-    (* zero matrix, except share h, which is x *)
-    mjmp <- offunm ((fun p s =>
-        if s = p then zero else
-        if s = h then x else zero), N, N);
-    return mjmp;
-  }
-
-  (* parties i and j know x, and want to share it with the two other
-     parties g and h.
-   *)
-  proc inp(x : elem, i j g h : party) : matrix = {
-    var r, xh : elem;
-    var pgm, minp : matrix;
-
-    (* in the paper this is a PRF, but for now model as truly random
-       and just don't give it to party g.
-       parties i, j, h generate r. *)
-    r <$ randelem;
-
-    (* only parties i and j know BOTH x and r, so only parties i and j know xh *)
-    xh <- x - r;
-
-    (* Use jmp to send xh from Pi, Pj to Pg *)
-    pgm <@ jmp(xh, i, j, g, h);
-
-    (* xi = xj = 0, xg = r, xh = x - r (within pgm) *)
-    minp <- pgm + offunm ((fun p s => 
-      if s = p then zero else
-      if s = g then r else zero), N, N);
-    return minp;
-  }
-
-  proc mult(mx my : matrix) : matrix = {
-    var m23, m13, m12, m03, m02, m01, mlocal : matrix;
-
-    (* perform inp on pairs of shares held by both parties.
-      for example, both parties 2 and 3 hold x0, x1, y0, y1, so they
-      can together compute the term x0y1 * x1y0.
-      
-      For symmetry we alternate which party we take the share from, but
-      the validity check ensures this doesn't actually change the output.
-     *)
-    m23 <@ inp(mx.[0, 1] * my.[1, 0] + mx.[1, 0] * my.[0, 1], 2, 3, 0, 1);
-    m13 <@ inp(mx.[0, 2] * my.[1, 0] + mx.[1, 0] * my.[0, 2], 1, 3, 0, 2);
-    m12 <@ inp(mx.[0, 3] * my.[1, 0] + mx.[1, 0] * my.[0, 3], 1, 2, 0, 3);
-    m03 <@ inp(mx.[0, 2] * my.[0, 1] + mx.[0, 1] * my.[0, 2], 0, 3, 1, 2);
-    m02 <@ inp(mx.[0, 3] * my.[0, 1] + mx.[0, 1] * my.[0, 3], 0, 2, 1, 3);
-    m01 <@ inp(mx.[0, 3] * my.[0, 2] + mx.[0, 2] * my.[0, 3], 0, 1, 2, 3);
-
-    (* elementwise multiplication to create sharing of x_i * y_i
-       this implements inp_local: no communication occurs *)
-    mlocal <- offunm ((fun p s => 
-      if s = p then zero else mx.[p, s] * my.[p, s]), N, N);
-
-    (* elementwise addition *)
-    return m01 + m02 + m03 + m12 + m13 + m23 + mlocal;   
-  }
-
-  proc add_main(x y : elem) : matrix = {
-    var mx, my, mz : matrix;
-
-    mx <@ share(x);
-    my <@ share(y);
-
-    (* addition is local *)
-    mz <- mx + my;
-
-    return mz;
-  }
-}.
-
 
 (* sum of four element list is the sum of the individual elements *)
 lemma sum_four(s : elem list) :
@@ -629,8 +596,6 @@ qed.
  * are indistinguishable. we cannot include parties i and j in this
  * security proof, since they already know the value of x. therefore,
  * no simulator could generate a share matrix which would fool them.
- *
- * precondition is ugly, maybe could be cleaned up with FSet.
  *)
 lemma inp_secure(i_ j_ g_ h_ : party, p : party) :
     equiv[F4.inp ~ Sim.inp :
@@ -771,6 +736,7 @@ auto => />; progress; smt().
 seq 1 : (open mx = x_ /\ size mx = (N, N) /\ valid mx /\
          open my = y_ /\ size my = (N, N) /\ valid my).
 call (share_correct y_).
+
 (*Validity proof*)
 auto.
 rewrite _4p.

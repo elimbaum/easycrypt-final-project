@@ -1331,20 +1331,22 @@ local lemma GReal_GIdeal:
 proof.
 proc.
 wp.
+
 seq 2 2 : (={glob Adv, mx, my} /\ 0 <= p < N).
 call (_: true).
 call (_: true).
 auto.
 
+(* 1st call to INP*)
 seq 2 2: (={glob Adv, mx, my, b1} /\ 0 <= p < N /\ 
            view m23{1} p = view m23{2} p /\ 
            rows m23{1} = rows m23{2} /\ rows m23{1} = N  /\ 
            cols m23{1} = cols m23{2} /\ cols m23{1} = N). 
 call (_ : true).
-
 call (inp_secure 2 3 0 1 p).
 auto; smt(_4p).
 
+(* 2nd call to INP*)
 seq 2 2: (={glob Adv, mx, my, b1, b2} /\ 0 <= p < N /\ 
             view m23{1} p = view m23{2} p /\ 
             rows m23{1} = rows m23{2}  /\ rows m23{1} = N /\ 
@@ -1356,6 +1358,7 @@ call (_ : true).
 call (inp_secure 1 3 0 2 p).
 auto; smt(_4p).
 
+(* 3rd call to INP*)
 seq 2 2: (={glob Adv, mx, my, b1, b2, b3} /\ 0 <= p < N /\
           view m23{1} p = view m23{2} p /\ 
           rows m23{1} = rows m23{2}  /\ rows m23{1} = N /\ 
@@ -1370,6 +1373,7 @@ call (_ : true).
 call (inp_secure 1 2 0 3 p).
 auto; smt(_4p).
 
+(* 4th call to INP*)
 seq 2 2: (={glob Adv, mx, my, b1, b2, b3, b4} /\ 0 <= p < N /\ 
              view m23{1} p = view m23{2} p /\ 
              rows m23{1} = rows m23{2}  /\ rows m23{1} = N /\ 
@@ -1387,6 +1391,7 @@ call (_ : true).
 call (inp_secure 0 3 1 2 p).
 auto; smt(_4p).
 
+(* 5th call to INP*)
 seq 2 2: (={glob Adv, mx, my, b1, b2, b3, b4, b5} /\ 0 <= p < N /\ 
             view m23{1} p = view m23{2} p /\ 
             rows m23{1} = rows m23{2} /\ rows m23{1} = N /\ 
@@ -1408,6 +1413,7 @@ call (_ : true).
 call (inp_secure 0 2 1 3 p).
 auto; smt(_4p).
 
+(* 6th call to INP*)
 seq 2 2: (={glob Adv, mx, my, b1, b2, b3, b4, b5, b6} /\ 0 <= p < N /\ 
             view m23{1} p = view m23{2} p /\ 
             rows m23{1} = rows m23{2} /\ rows m23{1} = N /\ 
@@ -1431,6 +1437,7 @@ call (_ : true).
 call (inp_secure 0 1 2 3 p).
 auto; smt(_4p).
 
+(*Handling INPLocal*)
 seq 2 2: (={glob Adv, mx, my, b1, b2, b3, b4, b5, b6, b7} /\ 0 <= p < N /\ 
             view m23{1} p = view m23{2} p /\ 
             rows m23{1} = rows m23{2} /\  rows m23{1} = N /\ 

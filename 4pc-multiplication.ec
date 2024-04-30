@@ -471,10 +471,10 @@ lemma jmp_correct(x_ : elem, si_ sj_ g_ h_ : party) :
       valid res /\ open res = x_].
 proof.
 proc.
-(*Proof for open*)
 auto.
 rewrite _4p.
 progress.
+(* Valid *)
 rewrite rows_offunm _4p lez_maxr //=.
 rewrite cols_offunm _4p lez_maxr //=.
 rewrite get_offunm.
@@ -488,14 +488,13 @@ rewrite get_offunm; first rewrite rows_offunm cols_offunm /= lez_maxr //.
 rewrite get_offunm; first rewrite rows_offunm cols_offunm /= lez_maxr //.
 rewrite eq_sym in H7.
 by rewrite /= H7 H8 /=.
-rewrite /open.
-rewrite !get_offunm; first 4 by rewrite rows_offunm cols_offunm //=.
+(* Open *)
+rewrite /open !get_offunm; first 4 by rewrite rows_offunm cols_offunm.
 simplify.
 case (h{hr} = 3) => [-> //= | hn3]; first by algebra.
 case (h{hr} = 2) => [-> //= | hn2]; first by algebra.
 case (h{hr} = 1) => [-> //= | hn1]; first by algebra.
-have -> : h{hr} = 0 by smt().
-simplify.
+have -> //= : h{hr} = 0 by smt().
 algebra.
 qed.
 
@@ -524,11 +523,11 @@ rewrite _4p.
 move => g0 g4 h0 h4 result rowsn colsn diag0 valid_s0 valid_snot0 openr.
 progress.
 (* first, inp output is valid. *)
-rewrite rows_addm rowsn rows_offunm /#.
-rewrite cols_addm colsn cols_offunm /#.
+rewrite rows_addm rowsn rows_offunm lez_maxr //=.
+rewrite cols_addm colsn cols_offunm lez_maxr //=.
 have mrange_a : mrange result a a.
   move : H0.
-  rewrite rowsn colsn rows_addm rowsn rows_offunm /#.
+  rewrite rowsn colsn rows_addm rowsn rows_offunm !lez_maxr //=.
 rewrite get_addm get_offunm; first rewrite rows_offunm cols_offunm.
 smt().
 simplify.
@@ -537,14 +536,12 @@ rewrite mrange_a.
 algebra.
 
 (* columns are equal *)
-rewrite 2!get_addm get_offunm.
-rewrite rows_offunm cols_offunm /max //=.
+rewrite 2!get_addm get_offunm; first rewrite rows_offunm cols_offunm /max //=.
 move: H0.
 rewrite rows_addm rowsn rows_offunm; first smt().
-rewrite get_offunm.
-rewrite rows_offunm cols_offunm //=.
+rewrite get_offunm; first rewrite rows_offunm cols_offunm //=.
 simplify.
-have resultp0_eq_result10: mrange result p 0 /\ p <> 0 /\ 0 = 0 => result.[p, 0] = result.[1, 0] by smt().
+have resultp0_eq_result10: mrange result p 0 /\ p <> 0 => result.[p, 0] = result.[1, 0] by smt().
 rewrite resultp0_eq_result10.
 progress.
 move: H0.
@@ -609,7 +606,6 @@ seq 2 3 : (={x,h,i,j,g,r,xh} /\
   i_ = i{2} /\ j_ = j{2} /\ h_ = h{2} /\ g_ = g{2} /\ 0 <= p < N).
 rnd{2}.
 auto.
-wp.
 inline F4.jmp.
 auto.
 rewrite _4p.
@@ -628,12 +624,6 @@ elim => inj [ing inh [jng jnh]].
 case (share = p) => [//= | off_diag].
 by rewrite add0r.
 have -> //= : p <> g{2} by smt().
-case (share = i{2}) => [-> //= | share_not_i].
-by rewrite inh ing add0r.
-case (share = j{2}) => [-> //= | share_not_j].
-by rewrite jnh jng //= add0r.
-case (share = g{2}) => [-> //= | share_not_g].
-by rewrite H2 //= add0r.
 smt(addrC add0r).
 
 (* end of first case: Pi Pj identical.
@@ -648,7 +638,6 @@ seq 1 2 : (={x,h,i,j,g,r} /\ p = h_ /\ h{1} = h_ /\ h_ <> g_ /\ g_ = g{2} /\ 0 <
 rnd{2}.
 auto.
 (* handle calls to jmp - same, but we can ignore xh, so value is unimportant *)
-auto.
 inline.
 auto.
 rewrite _4p.
@@ -662,10 +651,7 @@ rewrite !get_offunm; first 2 rewrite rows_offunm cols_offunm //=.
 simplify.
 rewrite !get_offunm; first 2 rewrite rows_offunm cols_offunm lez_maxr //.
 simplify.
-case (sh = g{2}) => [-> //= | sh_not_g].
-rewrite eq_sym in H.
-by rewrite H //= add0r.
-case (sh = h{2}) => [//= | sh_not_h]; by rewrite add0r.
+smt(add0r addrC).
 
 (* end of second case: secure against Ph.
    next, viewing party is pg. share (0, 0, g)
@@ -698,13 +684,7 @@ rewrite !get_offunm; first 2 rewrite rows_offunm cols_offunm lez_maxr //=.
 simplify.
 move : H9 H10.
 rewrite !negb_or => /> inj ing inh jng jnh.
-case (sh = g{2}) => [//= | sh_not_g].
-by rewrite add0r.
-case (sh = i{2}) => [-> //= | sh_not_i].
-by rewrite inh //= add0r.
-case (sh = j{2}) => [-> //= | sh_not_j].
-by rewrite jnh //= add0r.
-smt(addrC add0r).
+smt(add0r addrC).
 qed.
 
 (************************)
@@ -732,10 +712,9 @@ auto => />.
 rewrite _4p.
 move => &hr rows_mx cols_mx _ _ diag_mx not_diag_mx_left not_diag_mx_right rows_my cols_my _ _ diag_my not_diag_my_left not_diag_my_right.
 progress.
-rewrite rows_addm rows_mx rows_my /#.
-rewrite cols_addm cols_mx cols_my /#.
-rewrite get_addm.
-rewrite diag_mx.
+rewrite rows_addm rows_mx rows_my lez_maxr //.
+rewrite cols_addm cols_mx cols_my lez_maxr //.
+rewrite get_addm diag_mx.
 
 have alt4 : a < 4.
 move : H0.
@@ -759,15 +738,16 @@ rewrite rows_addm in H0.
 smt().
 smt().
 
+rewrite rows_addm in H0.
+rewrite cols_addm in H2.
+
 rewrite 2!get_addm.
 have mxps_eq_mx0s: mrange mx{hr} p s /\ p <> s /\ s <> 0 => mx{hr}.[p,s] = mx{hr}.[0, s].
 progress.
 by smt().
 rewrite mxps_eq_mx0s.
 progress.
-rewrite rows_addm in H0.
 smt().
-rewrite cols_addm in H2.
 smt().
 
 have myps_eq_my0s: mrange my{hr} p s /\ p <> s /\ s <> 0 => my{hr}.[p,s] = my{hr}.[0, s]. 
@@ -775,11 +755,8 @@ progress.
 by smt().
 rewrite  myps_eq_my0s.
 progress.
-rewrite rows_addm in H0.
 smt().
-rewrite cols_addm in H2.
 smt().
-
 smt().
 (*Corretness proof*)
 by rewrite open_linear.
@@ -924,8 +901,7 @@ rewrite valid_size // valid_size // valid_size //
 rewrite _4p rows_offunm lez_maxr // lez_maxr.
 
 rewrite get_offunm.
-rewrite rows_offunm cols_offunm.
-rewrite 5!rows_addm 5!cols_addm.
+rewrite rows_offunm cols_offunm 5!rows_addm 5!cols_addm.
 rewrite valid_size // valid_size // valid_size //
         valid_size // valid_size // valid_size //.
 rewrite _4p /= lez_maxr.
@@ -936,14 +912,11 @@ rewrite valid_size // valid_size // valid_size //
 rewrite _4p lez_maxr //.
 
 rewrite 6!get_addm.
-rewrite get_offunm.
-rewrite cols_offunm rows_offunm.
-trivial.
+rewrite get_offunm; first rewrite cols_offunm rows_offunm //=.
 simplify.
 rewrite 5!get_addm.
 rewrite get_offunm.
-rewrite cols_offunm rows_offunm lez_maxr //.
-trivial.
+rewrite cols_offunm rows_offunm lez_maxr //=.
 simplify.
 rewrite eq_sym in H17.
 rewrite H17 //=.

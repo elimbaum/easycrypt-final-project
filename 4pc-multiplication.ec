@@ -1154,17 +1154,21 @@ module GReal (Adv : ADV) = {
   proc add_main(): bool = {
     var x, y : elem;
     var mx, my, mz : matrix;
-    var b: bool;
+    var b1, b2, b3, b: bool;
 
-    x <@ Adv.getx();
-    y <@ Adv.gety();
+    x <@ Adv.getx(); (* Gets element x from the adversary *)
+    y <@ Adv.gety(); (* Gets element y from the adversary *)
 
-    mx <@ F4.share(x);
-    my <@ F4.share(y);
+    mx <@ F4.share(x); (* Call share of the simulator to get matrix mx *)
+    b1 <@ Adv.put(view mx p);
+
+    my <@ F4.share(y); (* Call share of the simulator to get matrix my *)
+    b2 <@ Adv.put(view my p);
 
     mz <- mx + my;
-
-    b <@ Adv.put(view mz p);
+    b3 <@ Adv.put(view mz p);
+    
+    b <- b1 /\ b2 /\ b3;
 
     return b;
   }
@@ -1242,18 +1246,22 @@ module GIdeal (Adv : ADV) = {
   proc add_main(): bool = {
     var x, y : elem;
     var mx, my, mz : matrix;
-    var b: bool;
+    var b1, b2, b3, b: bool;
 
-    x <@ Adv.getx();
-    y <@ Adv.gety();
+    x <@ Adv.getx(); (* Gets element x from the adversary *)
+    y <@ Adv.gety(); (* Gets element y from the adversary *)
 
-    mx <@ Sim.share(x);
-    my <@ Sim.share(y);
+    mx <@ Sim.share(x); (* Call share of the simulator to get matrix mx *)
+    b1 <@ Adv.put(view mx p);
+
+    my <@ Sim.share(y); (* Call share of the simulator to get matrix my *)
+    b2 <@ Adv.put(view my p);
 
     mz <- mx + my;
+    b3 <@ Adv.put(view mz p);
     
-    b <@ Adv.put(view mz p);
-    
+    b <- b1 /\ b2 /\ b3;
+
     return b;
   }
 }.
@@ -1514,9 +1522,12 @@ local lemma GReal_GIdeal :
           ={glob Adv} /\ 0 <= p < N ==> ={res}].
 proof.
 proc.
+wp.
 call (_: true).
 wp.
+call (_: true).
 call (share_secure p).
+call (_: true).
 call (share_secure p).
 call (_: true).
 call (_: true).

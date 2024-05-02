@@ -232,6 +232,7 @@ module F4 = {
 
     return mz;
   }
+
 }.
 
 (* Simulated Implementation of the Fantastic4 Protocol *)
@@ -297,8 +298,8 @@ module Sim = {
 
     return m01 + m02 + m03 + m12 + m13 + m23 + mlocal;   
   }
-
-  proc add(x y : elem) : matrix = {
+(*
+  proc add_main(x y : elem) : matrix = {
     var mx, my : matrix;
 
     (* these will be simulated random matrices *)
@@ -306,6 +307,7 @@ module Sim = {
     my <@ share(y);
     return mx + my;
   }
+*)
 }.
 
 (* sum of four element list is the sum of the individual elements *)
@@ -780,8 +782,9 @@ smt().
 by rewrite get_addm.
 qed.
 
+(*
 lemma add_secure(p : party) :
-    equiv[F4.add_main ~ Sim.add :
+    equiv[F4.add_main ~ Sim.add_main :
       ={x, y} /\ 0 <= p < N
       ==>
       view res{1} p = view res{2} p].
@@ -793,7 +796,7 @@ call (share_secure p).
 auto; progress.
 rewrite !view_linear //=; smt().
 qed.
-
+*)
 
 (************************)
 (* MULT *****************)
@@ -1063,10 +1066,16 @@ qed.
 
 module type ADV = {
 
-  (* Ask adversary for matrix mx *)
+  (* Ask adversary for element x: used in add_main *)
+  proc getx(): elem
+
+  (* Ask adversary for element y: used in add_main *)
+  proc gety(): elem
+
+  (* Ask adversary for matrix mx used in mult_main *)
   proc getmx(): matrix
   
-  (* Ask adversary for matrix my *)
+  (* Ask adversary for matrix my used in mult_main *)
   proc getmy(): matrix
 
   (* Adversary gets a view for a party p of the matrix and
@@ -1141,6 +1150,24 @@ module GReal (Adv : ADV) = {
     return b9;
 
   }
+
+  proc add_main(): bool = {
+    var x, y : elem;
+    var mx, my, mz : matrix;
+    var b: bool;
+
+    x <@ Adv.getx();
+    y <@ Adv.gety();
+
+    mx <@ F4.share(x);
+    my <@ F4.share(y);
+
+    mz <- mx + my;
+
+    b <@ Adv.put(view mz p);
+
+    return b;
+  }
 }.
 
 
@@ -1210,6 +1237,24 @@ module GIdeal (Adv : ADV) = {
     
     return b9; 
 
+  }
+
+  proc add_main(): bool = {
+    var x, y : elem;
+    var mx, my, mz : matrix;
+    var b: bool;
+
+    x <@ Adv.getx();
+    y <@ Adv.gety();
+
+    mx <@ Sim.share(x);
+    my <@ Sim.share(y);
+
+    mz <- mx + my;
+    
+    b <@ Adv.put(view mz p);
+    
+    return b;
   }
 }.
 
@@ -1453,4 +1498,57 @@ proof.
 rewrite _4p.
 progress.
 apply (Sec_Mult_Inp Adv &m); smt(_4p).
+qed.
+
+(************************)
+(* Proof for add_main **)
+(************************)
+
+section.
+
+(*There are no global states maintained in any of the modules*)
+declare module Adv <: ADV{}.
+
+local lemma GReal_GIdeal :
+    equiv[GReal(Adv).add_main ~ GIdeal(Adv).add_main:
+          ={glob Adv} /\ 0 <= p < N ==> ={res}].
+proof.
+proc.
+call (_: true).
+wp.
+call (share_secure p).
+call (share_secure p).
+call (_: true).
+call (_: true).
+auto.
+rewrite _4p.
+progress; smt(view_linear).
+qed.
+
+lemma Sec_Add_Main &m :
+    0 <= p < N => 
+    Pr[GReal(Adv).add_main() @ &m : res] = 
+    Pr[GIdeal(Adv).add_main() @ &m: res].
+proof.
+rewrite _4p.
+progress.
+byequiv => //.
+conseq  GReal_GIdeal.
+progress; by rewrite _4p.
+qed.
+
+end section.
+
+
+(* The security theorem which states that the adversary is completely unable
+to distinguish between the two games.*)
+
+lemma Security_Add_Main (Adv <: ADV{}) &m :
+    0 <= p < N => 
+    Pr[GReal(Adv).add_main() @ &m : res] = 
+    Pr[GIdeal(Adv).add_main() @ &m: res].
+proof.
+rewrite _4p.
+progress.
+apply (Sec_Add_Main Adv &m); by rewrite _4p.
 qed.

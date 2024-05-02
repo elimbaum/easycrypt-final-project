@@ -1069,7 +1069,7 @@ module type ADV = {
   (* Ask adversary for matrix my *)
   proc getmy(): matrix
 
-  (* Adversary gets a view for a party p of the multiplication result matrix and
+  (* Adversary gets a view for a party p of the matrix and
   asked to differentiate between the real and the ideal game. *)
   proc put(view_mz : vector) : bool
 }.

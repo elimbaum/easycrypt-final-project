@@ -90,8 +90,7 @@ op open(m : matrix) =
 lemma open_linear(mx my : matrix):
     open (mx + my) = open mx + open my.
 proof.
-rewrite /open.
-rewrite 4!get_addm.
+rewrite /open 4!get_addm.
 algebra.
 qed.
 
@@ -412,7 +411,7 @@ rewrite /view /row 2!cols_offunm lez_maxr // eq_vectorP 2!size_offunv //=.
 move => sh [shgt0 shlt4].
 (* extract matrix *)
 rewrite !get_offunv //=.
-rewrite !get_offunm; first 2 rewrite rows_offunm cols_offunm /#.
+rewrite !get_offunm; first 2 rewrite rows_offunm cols_offunm //.
 simplify.
 smt().
 
@@ -547,9 +546,9 @@ have resultp0_eq_result10: mrange result p 0 /\ p <> 0 => result.[p, 0] = result
 rewrite resultp0_eq_result10.
 progress.
 move: H0.
-rewrite rows_addm rowsn rows_offunm /#.
+rewrite rows_addm rowsn rows_offunm //; rewrite colsn //.
 move: H1.
-rewrite cols_addm colsn cols_offunm /#.
+rewrite cols_addm colsn cols_offunm //; rewrite colsn //.
 smt().
 
 rewrite 2!get_addm get_offunm.
@@ -782,21 +781,7 @@ smt().
 by rewrite get_addm.
 qed.
 
-(*
-lemma add_secure(p : party) :
-    equiv[F4.add_main ~ Sim.add_main :
-      ={x, y} /\ 0 <= p < N
-      ==>
-      view res{1} p = view res{2} p].
-proof.
-proc.
-wp.
-call (share_secure p).
-call (share_secure p).
-auto; progress.
-rewrite !view_linear //=; smt().
-qed.
-*)
+(* We prove add secure, below, in the game style. *)
 
 (************************)
 (* MULT *****************)
@@ -925,21 +910,21 @@ rewrite eq_sym in H17.
 rewrite H17 //=.
 
 rewrite (valid_col0 result) //.
-rewrite _4p /#.
+rewrite _4p; smt().
 rewrite (valid_col0 result0) //.
-rewrite _4p /#.
+rewrite _4p; smt().
 rewrite (valid_col0 result1) //.
-rewrite _4p /#.
+rewrite _4p; smt().
 rewrite (valid_col0 result2) //.
-rewrite _4p /#.
+rewrite _4p; smt().
 rewrite (valid_col0 result3) //.
-rewrite _4p /#.
+rewrite _4p; smt().
 rewrite (valid_col0 result4) //.
-rewrite _4p /#.
+rewrite _4p; smt().
 rewrite (valid_col0 mx{hr}) //.
-rewrite _4p /#.
+rewrite _4p; smt().
 rewrite (valid_col0 my{hr}) //.
-rewrite _4p /#.
+rewrite _4p; smt().
 trivial.
 
 (* 3b. prove the other columns are consistent *)
@@ -983,21 +968,21 @@ rewrite H18.
 rewrite eq_sym in H17.
 rewrite H17 //=.
 rewrite (valid_colp result) //.
-rewrite valid_size // valid_size // _4p /#.
+rewrite valid_size // valid_size // _4p; smt().
 rewrite (valid_colp result0) //.
-rewrite valid_size // valid_size // _4p /#.
+rewrite valid_size // valid_size // _4p; smt().
 rewrite (valid_colp result1) //.
-rewrite valid_size // valid_size // _4p /#.
+rewrite valid_size // valid_size // _4p; smt().
 rewrite (valid_colp result2) //.
-rewrite valid_size // valid_size // _4p /#.
+rewrite valid_size // valid_size // _4p; smt().
 rewrite (valid_colp result3) //.
-rewrite valid_size // valid_size // _4p /#.
+rewrite valid_size // valid_size // _4p; smt().
 rewrite (valid_colp result4) //.
-rewrite valid_size // valid_size // _4p /#.
+rewrite valid_size // valid_size // _4p; smt().
 rewrite (valid_colp mx{hr}) //.
-rewrite valid_size // valid_size // _4p /#.
+rewrite valid_size // valid_size // _4p; smt().
 rewrite (valid_colp my{hr}) //.
-rewrite valid_size // valid_size // _4p /#.
+rewrite valid_size // valid_size // _4p; smt().
 qed.
 
 lemma mult_secure(p: party) :
